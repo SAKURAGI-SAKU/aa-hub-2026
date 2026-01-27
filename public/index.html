@@ -6,18 +6,14 @@
     <style>
         body { font-family: sans-serif; background: #f4f4f9; padding: 20px; max-width: 900px; margin: 0 auto; }
         .card { background: white; padding: 15px; margin-bottom: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        .aa-content { 
-            font-family: "Mona", "MS PGothic", "ＭＳ Ｐゴシック", sans-serif; 
-            font-size: 16px; line-height: 1.1; white-space: pre; 
-            overflow: hidden; max-height: 300px; transition: max-height 0.3s;
-            background: #fff; padding: 15px; border: 1px solid #ddd; overflow-x: auto;
-        }
+        .aa-content { font-family: "Mona", "MS PGothic", "ＭＳ Ｐゴシック", sans-serif; font-size: 16px; line-height: 1.1; white-space: pre; overflow: hidden; max-height: 300px; transition: max-height 0.3s; background: #fff; padding: 15px; border: 1px solid #ddd; overflow-x: auto;}
         .aa-content.expanded { max-height: none; }
         .expand-btn { width: 100%; padding: 8px; background: #eee; border: none; cursor: pointer; border-radius: 0 0 5px 5px; }
         #auth-header { text-align: right; margin-bottom: 20px; }
         .hidden { display: none; }
-        .like-btn { background: none; border: 1px solid #ff4757; color: #ff4757; border-radius: 20px; padding: 5px 15px; cursor: pointer; margin-top: 10px; }
-        input, textarea { width: 100%; box-sizing: border-box; margin-bottom: 10px; padding: 10px; border: 1px solid #ccc; border-radius: 4px; }
+        .like-btn { border: 1px solid #ff4757; color: #ff4757; }
+        .like-btn.liked { background-color: #ff4757; color: white; } /* いいね済み */
+        input, textarea, .like-btn { padding: 10px; border-radius: 20px; cursor: pointer; }
     </style>
 </head>
 <body>
@@ -61,13 +57,15 @@
             const data = await res.json();
             document.getElementById('post-list').innerHTML = data.map(p => {
                 const isLong = p.content.split('\n').length > 15 || p.content.length > 500;
+                // ログインユーザーがいいねしているかチェック
+                const likedClass = (currentUser && p.likedBy && p.likedBy.includes(currentUser.userId)) ? 'liked' : '';
                 return `
                 <div class="card">
                     <small>${p.author} | ${new Date(p.createdAt).toLocaleString()}</small>
                     <h3 style="margin:5px 0;">${p.title}</h3>
                     <div id="content-${p.id}" class="aa-content">${p.content}</div>
                     ${isLong ? `<button class="expand-btn" onclick="toggleAA('${p.id}', this)">広げる</button>` : ''}
-                    <button class="like-btn" onclick="likePost('${p.id}')">❤️ <span id="like-${p.id}">${p.likes || 0}</span></button>
+                    <button class="like-btn ${likedClass}" onclick="likePost('${p.id}', this)">❤️ <span id="like-${p.id}">${p.likes || 0}</span></button>
                 </div>
             `}).join('');
         }
@@ -78,22 +76,47 @@
             btn.innerText = el.classList.contains('expanded') ? '折りたたむ' : '広げる';
         }
 
-        async function likePost(id) {
-            const res = await fetch(`/api/posts/${id}/like`, { method: 'POST' });
+        async function likePost(id, buttonElement) {
+            if (!currentUser) return alert("いいねするにはログインしてください。");
+
+            const res = await fetch(`/api/posts/${id}/like`, { 
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ userId: currentUser.userId }) // ユーザーIDを送信
+            });
             const data = await res.json();
-            if(data.success) document.getElementById('like-' + id).innerText = data.likes;
+            
+            if (data.success) {
+                document.getElementById('like-' + id).innerText = data.likes;
+                buttonElement.classList.add('liked'); // いいね済みクラスを追加
+            } else {
+                alert(data.error); // エラーメッセージを表示
+            }
         }
 
         async function postAA() {
             const title = document.getElementById('title').value;
             const content = document.getElementById('content').value;
             if(!title || !content) return alert('入力してください');
-            await fetch('/api/posts', {
+
+            const postData = { title, content };
+            if (currentUser) {
+                postData.author = currentUser.displayName;
+                postData.userId = currentUser.userId; // 連続投稿制限のためにIDも送信
+            }
+
+            const res = await fetch('/api/posts', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ title, content, author: currentUser ? currentUser.displayName : "名無し" })
+                body: JSON.stringify(postData)
             });
-            location.reload();
+            const data = await res.json();
+            
+            if (data.error) {
+                alert(data.error);
+            } else {
+                location.reload();
+            }
         }
 
         updateUI();
