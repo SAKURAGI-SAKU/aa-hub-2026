@@ -11,15 +11,17 @@
         .expand-btn { width: 100%; padding: 8px; background: #eee; border: none; cursor: pointer; border-radius: 0 0 5px 5px; }
         #auth-header { text-align: right; margin-bottom: 20px; }
         .hidden { display: none; }
-        .like-btn { border: 1px solid #ff4757; color: #ff4757; }
-        .like-btn.liked { background-color: #ff4757; color: white; } /* いいね済み */
-        input, textarea, .like-btn { padding: 10px; border-radius: 20px; cursor: pointer; }
+        .like-btn { border: 1px solid #ff4757; color: #ff4757; background: white; border-radius: 20px; padding: 5px 15px; cursor: pointer; margin-top: 10px; }
+        .like-btn.liked { background-color: #ff4757; color: white; }
+        input, textarea { width: 100%; box-sizing: border-box; margin-bottom: 10px; padding: 10px; border: 1px solid #ccc; border-radius: 4px; }
+        .main-btn { width: 100%; padding: 12px; background: #1e90ff; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
+        .main-btn:disabled { background: #ccc; cursor: not-allowed; }
     </style>
 </head>
 <body>
     <div id="auth-header">
         <div id="guest-zone">
-            <a href="/login.html">ログイン / 新規登録</a>
+            <a href="/login.html">ログイン / 新規登録して投稿する</a>
         </div>
         <div id="user-zone" class="hidden">
             <span id="welcome-msg"></span> | <a href="#" onclick="logout()">ログアウト</a>
@@ -28,10 +30,11 @@
 
     <h1>AA HUB 2026</h1>
 
-    <div id="post-form" class="card">
+    <!-- ログインしている時だけ表示 -->
+    <div id="post-form-container" class="card hidden">
         <input id="title" placeholder="タイトル">
         <textarea id="content" placeholder="AAを貼り付け" rows="5"></textarea>
-        <button onclick="postAA()" style="width:100%; padding:10px; background:#1e90ff; color:white; border:none; border-radius:5px; cursor:pointer;">投稿する</button>
+        <button id="submit-btn" onclick="postAA()" class="main-btn">投稿する</button>
     </div>
 
     <div id="post-list"></div>
@@ -43,6 +46,7 @@
             if(currentUser) {
                 document.getElementById('guest-zone').classList.add('hidden');
                 document.getElementById('user-zone').classList.remove('hidden');
+                document.getElementById('post-form-container').classList.remove('hidden');
                 document.getElementById('welcome-msg').innerText = currentUser.displayName + "さん";
             }
         }
@@ -57,7 +61,6 @@
             const data = await res.json();
             document.getElementById('post-list').innerHTML = data.map(p => {
                 const isLong = p.content.split('\n').length > 15 || p.content.length > 500;
-                // ログインユーザーがいいねしているかチェック
                 const likedClass = (currentUser && p.likedBy && p.likedBy.includes(currentUser.userId)) ? 'liked' : '';
                 return `
                 <div class="card">
@@ -76,46 +79,52 @@
             btn.innerText = el.classList.contains('expanded') ? '折りたたむ' : '広げる';
         }
 
-        async function likePost(id, buttonElement) {
-            if (!currentUser) return alert("いいねするにはログインしてください。");
-
+        async function likePost(id, btn) {
+            if (!currentUser) return alert("ログインが必要です");
             const res = await fetch(`/api/posts/${id}/like`, { 
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ userId: currentUser.userId }) // ユーザーIDを送信
+                body: JSON.stringify({ userId: currentUser.userId })
             });
             const data = await res.json();
-            
             if (data.success) {
                 document.getElementById('like-' + id).innerText = data.likes;
-                buttonElement.classList.add('liked'); // いいね済みクラスを追加
-            } else {
-                alert(data.error); // エラーメッセージを表示
-            }
+                btn.classList.add('liked');
+            } else { alert(data.error); }
         }
 
         async function postAA() {
+            const btn = document.getElementById('submit-btn');
             const title = document.getElementById('title').value;
             const content = document.getElementById('content').value;
             if(!title || !content) return alert('入力してください');
 
-            const postData = { title, content };
-            if (currentUser) {
-                postData.author = currentUser.displayName;
-                postData.userId = currentUser.userId; // 連続投稿制限のためにIDも送信
-            }
+            // ★連打防止：ボタンを無効化
+            btn.disabled = true;
+            btn.innerText = "投稿中...";
 
-            const res = await fetch('/api/posts', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify(postData)
-            });
-            const data = await res.json();
-            
-            if (data.error) {
-                alert(data.error);
-            } else {
-                location.reload();
+            try {
+                const res = await fetch('/api/posts', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ 
+                        title, content, 
+                        author: currentUser.displayName, 
+                        userId: currentUser.userId 
+                    })
+                });
+                const data = await res.json();
+                if (data.error) {
+                    alert(data.error);
+                    btn.disabled = false;
+                    btn.innerText = "投稿する";
+                } else {
+                    location.reload();
+                }
+            } catch (e) {
+                alert("通信エラーが発生しました");
+                btn.disabled = false;
+                btn.innerText = "投稿する";
             }
         }
 
