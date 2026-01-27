@@ -28,11 +28,12 @@ app.post("/api/login", async (req, res) => {
     }
 });
 
-// --- 掲示板API (検索・タグ対応) ---
+// --- 掲示板API (安定化修正) ---
 app.get("/api/posts", async (req, res) => {
-    const { q } = req.query; // 検索ワード
+    const { q } = req.query;
     const posts = [];
-    const iter = kv.list({ prefix: ["posts"] }, { reverse: true });
+    // consistency: "strong" を追加して最新データを確実に取得
+    const iter = kv.list({ prefix: ["posts"] }, { reverse: true, consistency: "strong" });
     for await (const entry of iter) {
         const p = entry.value;
         if (q) {
@@ -46,7 +47,7 @@ app.get("/api/posts", async (req, res) => {
 
 app.get("/api/users/:userId/posts", async (req, res) => {
     const posts = [];
-    const iter = kv.list({ prefix: ["posts"] }, { reverse: true });
+    const iter = kv.list({ prefix: ["posts"] }, { reverse: true, consistency: "strong" });
     for await (const entry of iter) {
         if (entry.value.userId === req.params.userId) posts.push(entry.value);
     }
@@ -55,19 +56,25 @@ app.get("/api/users/:userId/posts", async (req, res) => {
 
 app.post("/api/posts", async (req, res) => {
     const { title, content, author, userId, tags } = req.body;
+    if (!userId) return res.status(401).json({ error: "ログインが必要です" });
+    
     const lastPostKey = ["user_last_post", userId];
     const lastPost = await kv.get(lastPostKey);
     const now = Date.now();
-    if (lastPost.value && now - lastPost.value < 10000) return res.status(429).json({ error: "10秒待ってください" });
+    if (lastPost.value && now - lastPost.value < 5000) { // 制限を5秒に緩和
+        return res.status(429).json({ error: "少し待ってから投稿してください" });
+    }
+    
     const id = now.toString();
-    // タグを配列として保存
     const tagList = tags ? tags.split(',').map(t => t.trim()).filter(t => t) : [];
     const newPost = { id, title, content, author, userId, tags: tagList, likes: 0, likedBy: [], createdAt: new Date() };
+    
     await kv.set(["posts", id], newPost);
     await kv.set(lastPostKey, now);
     res.json({ success: true });
 });
 
+// --- いいね・通報・通知・管理 (変更なし/安定化のみ反映) ---
 app.post("/api/posts/:id/like", async (req, res) => {
     const { id } = req.params;
     const { userId } = req.body;
@@ -90,7 +97,6 @@ app.post("/api/report", async (req, res) => {
     res.json({ success: true });
 });
 
-// --- 通知・管理機能 (変更なし) ---
 app.post("/api/admin/notify", async (req, res) => {
     const { adminId, targetUserId, message } = req.body;
     const admin = await kv.get(["users", adminId]);
@@ -102,14 +108,14 @@ app.post("/api/admin/notify", async (req, res) => {
 
 app.get("/api/notifications/:userId", async (req, res) => {
     const notes = [];
-    const iter = kv.list({ prefix: ["notifications", req.params.userId] }, { reverse: true });
+    const iter = kv.list({ prefix: ["notifications", req.params.userId] }, { reverse: true, consistency: "strong" });
     for await (const entry of iter) { notes.push(entry.value); }
     res.json(notes);
 });
 
 app.get("/api/admin/reports", async (req, res) => {
     const reports = [];
-    const iter = kv.list({ prefix: ["reports"] }, { reverse: true });
+    const iter = kv.list({ prefix: ["reports"] }, { reverse: true, consistency: "strong" });
     for await (const entry of iter) { reports.push(entry.value); }
     res.json(reports);
 });
