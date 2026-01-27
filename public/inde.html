@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>AA HUB 2026</title>
+    <style>
+        /* AAを綺麗に表示する魔法のスタイル */
+        .aa-content {
+            font-family: "Mona", "MS PGothic", "ＭＳ Ｐゴシック", sans-serif;
+            font-size: 16px;
+            line-height: 1.1;
+            white-space: pre; /* 改行とスペースを維持 */
+            overflow-x: auto; /* はみ出したら横スクロール */
+            background: #fff;
+            padding: 10px;
+            border: 1px solid #ccc;
+            display: inline-block; /* 内容に合わせる */
+            min-width: 300px;
+        }
+    </style>
+</head>
+<body>
+    <h1>AA HUB 2026</h1>
+    <div id="app">
+        <input id="title" placeholder="タイトル"><br>
+        <textarea id="content" placeholder="AAを貼り付け" rows="5" cols="40"></textarea><br>
+        <button onclick="postAA()">投稿する</button>
+        <hr>
+        <div id="post-list"></div>
+    </div>
+
+    <script>
+        // 投稿を読み込む関数
+        async function loadPosts() {
+            const res = await fetch('/api/posts');
+            const data = await res.json();
+            const list = document.getElementById('post-list');
+            list.innerHTML = data.map(p => `
+                <div>
+                    <h3>${p.title}</h3>
+                    <div class="aa-content">${p.content}</div>
+                </div>
+            `).join('');
+        }
+
+        // 投稿を送信する関数
+        async function postAA() {
+            const title = document.getElementById('title').value;
+            const content = document.getElementById('content').value;
+            await fetch('/api/posts', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ title, content })
+            });
+            loadPosts();
+        }
+
+        loadPosts();
+    </script>
+</body>
+</html>
