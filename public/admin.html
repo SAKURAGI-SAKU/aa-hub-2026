@@ -5,86 +5,43 @@
     <title>管理パネル - AA HUB</title>
     <style>
         body { font-family: sans-serif; background: #2f3542; color: white; padding: 20px; max-width: 800px; margin: 0 auto; }
-        .admin-card { background: #57606f; padding: 20px; margin-bottom: 20px; border-radius: 12px; }
-        input, textarea { width: 100%; box-sizing: border-box; padding: 10px; margin-bottom: 10px; border-radius: 5px; border: none; }
-        button { cursor: pointer; padding: 10px 20px; border-radius: 6px; border: none; font-weight: bold; }
-        .del-btn { background: #ff4757; color: white; }
-        .emergency-btn { background: #ffa502; color: white; width: 100%; }
-        .report-card { background: #2f3542; padding: 15px; margin-bottom: 10px; border-radius: 8px; border-left: 5px solid #ff4757; }
-        a { color: #70a1ff; text-decoration: none; }
+        .card { background: #57606f; padding: 20px; margin-bottom: 20px; border-radius: 12px; }
+        button { cursor: pointer; padding: 10px; border-radius: 5px; border: none; margin-top: 5px; }
     </style>
 </head>
 <body>
     <h1>管理パネル</h1>
-    <p><a href="/">← 掲示板に戻る</a></p>
-
-    <!-- 緊急告知送信フォーム -->
-    <div class="admin-card">
-        <h3>🚨 全ユーザーへの緊急告知</h3>
-        <textarea id="emergency-msg" placeholder="サイトを開いた瞬間に全員に強制表示するメッセージを入力..." rows="3"></textarea>
-        <button class="emergency-btn" onclick="sendEmergency()">緊急告知を配信する</button>
+    <div class="card">
+        <h3>🚨 全体告知</h3>
+        <textarea id="em-msg" style="width:100%" rows="3"></textarea>
+        <button onclick="sendEm()" style="background:orange; width:100%">全体に強制表示</button>
     </div>
-
-    <h2>🚩 通報一覧</h2>
-    <div id="report-list">読み込み中...</div>
+    <div id="reports"></div>
 
     <script>
-        const currentUser = JSON.parse(localStorage.getItem('aa_user') || 'null');
-        if(!currentUser?.isAdmin) location.href = "/";
-
-        async function sendEmergency() {
-            const msg = document.getElementById('emergency-msg').value;
-            if(!msg) return alert("メッセージを入力してください");
-            if(!confirm("全ユーザーの画面に強制表示されます。よろしいですか？")) return;
-
-            const res = await fetch('/api/admin/emergency', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ adminId: currentUser.userId, message: msg })
-            });
-            if(res.ok) {
-                alert("告知を送信しました");
-                document.getElementById('emergency-msg').value = "";
-            }
+        const currentUser = JSON.parse(localStorage.getItem('aa_user'));
+        async function sendEm() {
+            const message = document.getElementById('em-msg').value;
+            await fetch('/api/admin/emergency', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ adminId: currentUser.userId, message }) });
+            alert("送信完了");
         }
-
         async function loadReports() {
             const res = await fetch('/api/admin/reports');
             const data = await res.json();
-            document.getElementById('report-list').innerHTML = data.map(r => `
-                <div class="report-card">
-                    <p><strong>理由:</strong> ${r.reason}</p>
-                    <p><small>対象ユーザー: ${r.targetUserId} | 投稿ID: ${r.postId}</small></p>
-                    <button class="del-btn" onclick="deletePost('${r.postId}')">投稿削除</button>
-                    <button onclick="sendNote('${r.targetUserId}')">DM通知を送る</button>
-                    <button style="background:#ffa502;color:white;" onclick="banUser('${r.targetUserId}')">BAN</button>
-                </div>`).join('') || "通報はありません";
+            document.getElementById('reports').innerHTML = data.map(r => `
+                <div class="card">
+                    <p>理由: ${r.reason} (対象: ${r.targetUserId})</p>
+                    <button onclick="sendNote('${r.targetUserId}', false)">通常DM</button>
+                    <button onclick="sendNote('${r.targetUserId}', true)" style="background:red; color:white">強制表示DM</button>
+                    <button onclick="deletePost('${r.postId}')">投稿削除</button>
+                </div>`).join('');
         }
-
-        async function sendNote(uid) {
-            const msg = prompt("ユーザーへの個別メッセージ:");
+        async function sendNote(uid, isEm) {
+            const msg = prompt("メッセージ:");
             if(!msg) return;
-            await fetch('/api/admin/notify', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ adminId: currentUser.userId, targetUserId: uid, message: msg })
-            });
-            alert("通知しました");
+            await fetch('/api/admin/notify', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ adminId: currentUser.userId, targetUserId: uid, message: msg, isEmergency: isEm }) });
+            alert("送信しました");
         }
-
-        async function deletePost(pid) {
-            if(!confirm("消しますか？")) return;
-            await fetch('/api/admin/delete', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ postId: pid, adminId: currentUser.userId }) });
-            loadReports();
-        }
-
-        async function banUser(uid) {
-            if(!confirm("このユーザーをBANしますか？")) return;
-            await fetch('/api/admin/ban', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ adminId: currentUser.userId, targetUserId: uid }) });
-            alert("BAN完了");
-            loadReports();
-        }
-
         loadReports();
     </script>
 </body>
