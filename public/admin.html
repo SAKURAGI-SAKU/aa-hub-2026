@@ -5,45 +5,45 @@
     <title>管理パネル - AA HUB</title>
     <style>
         body { font-family: sans-serif; background: #2f3542; color: white; padding: 20px; }
-        .admin-card { background: #57606f; padding: 15px; margin-bottom: 20px; border-radius: 8px; }
-        .del-btn { background: #ff4757; color: white; border: none; padding: 5px 10px; border-radius: 5px; cursor: pointer; }
-        a { color: #1e90ff; }
+        .report-card { background: #57606f; padding: 15px; margin-bottom: 10px; border-radius: 8px; border-left: 5px solid #ff4757; }
+        button { cursor: pointer; padding: 5px 10px; border-radius: 4px; border: none; margin-right: 5px; }
+        .del-btn { background: #ff4757; color: white; }
     </style>
 </head>
 <body>
-    <h1>管理パネル</h1>
-    <p><a href="/">掲示板に戻る</a></p>
-
-    <h2>🚩 通報一覧</h2>
+    <h1>管理パネル (通報・削除)</h1>
+    <p><a href="/" style="color:#1e90ff;">← 掲示板に戻る</a></p>
     <div id="report-list">読み込み中...</div>
 
     <script>
         const currentUser = JSON.parse(localStorage.getItem('aa_user') || 'null');
-        if (!currentUser || !currentUser.isAdmin) { alert("権限なし"); window.location.href = "/"; }
+        if(!currentUser?.isAdmin) location.href = "/";
 
-        async function loadAdminData() {
+        async function loadReports() {
             const res = await fetch('/api/admin/reports');
             const data = await res.json();
             document.getElementById('report-list').innerHTML = data.map(r => `
-                <div class="admin-card">
+                <div class="report-card">
                     <p><strong>理由:</strong> ${r.reason}</p>
-                    <p><small>通報者: ${r.reporterId} | 投稿ID: ${r.postId}</small></p>
-                    <button class="del-btn" onclick="deletePost('${r.postId}')">この投稿を削除</button>
-                </div>
-            `).join('') || "通報はありません";
+                    <p><small>通報者: ${r.reporterId} | 対象ユーザー: ${r.targetUserId}</small></p>
+                    <button class="del-btn" onclick="deletePost('${r.postId}')">投稿削除</button>
+                    <button onclick="sendNote('${r.targetUserId}')">通知(DM)を送る</button>
+                </div>`).join('') || "通報はありません";
         }
 
-        async function deletePost(postId) {
-            if (!confirm("本当に削除しますか？")) return;
-            await fetch('/api/admin/delete', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ postId, adminId: currentUser.userId })
-            });
-            alert("削除しました");
-            loadAdminData();
+        async function deletePost(pid) {
+            if(!confirm("消しますか？")) return;
+            await fetch('/api/admin/delete', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ postId: pid, adminId: currentUser.userId }) });
+            loadReports();
         }
-        loadAdminData();
+
+        async function sendNote(uid) {
+            const msg = prompt("メッセージ内容:");
+            if(!msg) return;
+            await fetch('/api/admin/notify', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ adminId: currentUser.userId, targetUserId: uid, message: msg }) });
+            alert("送信しました");
+        }
+        loadReports();
     </script>
 </body>
 </html>
