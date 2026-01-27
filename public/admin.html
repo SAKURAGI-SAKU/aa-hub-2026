@@ -6,42 +6,73 @@
     <style>
         body { font-family: sans-serif; background: #2f3542; color: white; padding: 20px; max-width: 800px; margin: 0 auto; }
         .card { background: #57606f; padding: 20px; margin-bottom: 20px; border-radius: 12px; }
-        button { cursor: pointer; padding: 10px; border-radius: 5px; border: none; margin-top: 5px; }
+        button { cursor: pointer; padding: 10px; border-radius: 5px; border: none; margin-top: 5px; margin-right: 5px; }
+        textarea { width: 100%; border-radius: 5px; padding: 10px; box-sizing: border-box; }
     </style>
 </head>
 <body>
     <h1>管理パネル</h1>
     <div class="card">
         <h3>🚨 全体告知</h3>
-        <textarea id="em-msg" style="width:100%" rows="3"></textarea>
-        <button onclick="sendEm()" style="background:orange; width:100%">全体に強制表示</button>
+        <textarea id="em-msg" rows="3" placeholder="すべてのユーザーにポップアップで表示されます"></textarea>
+        <button onclick="sendEm()" style="background:orange; width:100%; font-weight:bold;">全体に強制表示</button>
     </div>
-    <div id="reports"></div>
+    <h2>通報一覧</h2>
+    <div id="reports">読み込み中...</div>
 
     <script>
         const currentUser = JSON.parse(localStorage.getItem('aa_user'));
+        if (!currentUser || !currentUser.isAdmin) {
+            alert("権限がありません");
+            window.location.href = "/";
+        }
+
         async function sendEm() {
             const message = document.getElementById('em-msg').value;
-            await fetch('/api/admin/emergency', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ adminId: currentUser.userId, message }) });
+            if(!message) return;
+            await fetch('/api/admin/emergency', { 
+                method: 'POST', 
+                headers: {'Content-Type':'application/json'}, 
+                body: JSON.stringify({ adminId: currentUser.userId, message }) 
+            });
             alert("送信完了");
         }
+
         async function loadReports() {
             const res = await fetch('/api/admin/reports');
             const data = await res.json();
             document.getElementById('reports').innerHTML = data.map(r => `
                 <div class="card">
-                    <p>理由: ${r.reason} (対象: ${r.targetUserId})</p>
+                    <p><strong>理由:</strong> ${r.reason}</p>
+                    <p><small>対象ユーザー: ${r.targetUserId} / 投稿ID: ${r.postId}</small></p>
                     <button onclick="sendNote('${r.targetUserId}', false)">通常DM</button>
-                    <button onclick="sendNote('${r.targetUserId}', true)" style="background:red; color:white">強制表示DM</button>
-                    <button onclick="deletePost('${r.postId}')">投稿削除</button>
-                </div>`).join('');
+                    <button onclick="sendNote('${r.targetUserId}', true)" style="background:red; color:white">強制通知DM</button>
+                    <button onclick="deletePost('${r.postId}')" style="background:#2f3542; color:white">投稿削除</button>
+                </div>`).join('') || "通報はありません";
         }
+
         async function sendNote(uid, isEm) {
-            const msg = prompt("メッセージ:");
+            const msg = prompt("ユーザーへのメッセージ:");
             if(!msg) return;
-            await fetch('/api/admin/notify', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ adminId: currentUser.userId, targetUserId: uid, message: msg, isEmergency: isEm }) });
+            await fetch('/api/admin/notify', { 
+                method: 'POST', 
+                headers: {'Content-Type':'application/json'}, 
+                body: JSON.stringify({ adminId: currentUser.userId, targetUserId: uid, message: msg, isEmergency: isEm }) 
+            });
             alert("送信しました");
         }
+
+        async function deletePost(postId) {
+            if(!confirm("この投稿を削除しますか？")) return;
+            await fetch('/api/admin/delete', { 
+                method: 'POST', 
+                headers: {'Content-Type':'application/json'}, 
+                body: JSON.stringify({ adminId: currentUser.userId, postId }) 
+            });
+            alert("削除完了");
+            loadReports();
+        }
+
         loadReports();
     </script>
 </body>
