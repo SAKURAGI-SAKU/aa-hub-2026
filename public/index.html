@@ -10,13 +10,13 @@
         .aa-content.expanded { max-height: none; }
         #auth-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
         .hidden { display: none; }
-        .badge { background: red; color: white; border-radius: 50%; padding: 2px 6px; font-size: 10px; vertical-align: top; margin-left: -10px; }
-        .user-link { cursor: pointer; color: #1e90ff; text-decoration: underline; }
+        .badge { background: red; color: white; border-radius: 10px; padding: 2px 6px; font-size: 10px; position: relative; top: -10px; left: -5px; }
+        .user-link { color: #1e90ff; text-decoration: none; font-weight: bold; cursor: pointer; }
         .btn-group { margin-top: 10px; display: flex; gap: 10px; }
         .like-btn, .report-btn { border: 1px solid #ddd; background: white; border-radius: 20px; padding: 5px 15px; cursor: pointer; }
-        .like-btn.liked { background-color: #ff4757; color: white; border-color: #ff4757; }
+        .like-btn.liked { background: #ff4757; color: white; border-color: #ff4757; }
         input, textarea { width: 100%; box-sizing: border-box; margin-bottom: 10px; padding: 10px; border: 1px solid #ccc; border-radius: 4px; }
-        .main-btn { width: 100%; padding: 12px; background: #1e90ff; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
+        .main-btn { width: 100%; padding: 12px; background: #1e90ff; color: white; border: none; border-radius: 5px; cursor: pointer; }
     </style>
 </head>
 <body>
@@ -25,7 +25,7 @@
         <div id="auth-zone">
             <div id="guest-zone"><a href="/login.html">ログイン / 新規登録</a></div>
             <div id="user-zone" class="hidden">
-                <span id="nav-notes" style="cursor:pointer; margin-right:15px;" onclick="showNotes()">✉️<span id="note-badge" class="badge hidden">0</span></span>
+                <span onclick="showNotes()" style="cursor:pointer; margin-right:15px;">✉️<span id="note-badge" class="badge hidden">0</span></span>
                 <span id="welcome-msg"></span> | <a href="#" onclick="logout()">ログアウト</a>
             </div>
         </div>
@@ -35,41 +35,34 @@
         <input id="title" placeholder="タイトル"><textarea id="content" placeholder="AAを貼り付け" rows="5"></textarea>
         <button id="submit-btn" onclick="postAA()" class="main-btn">投稿する</button>
     </div>
-
     <div id="post-list"></div>
 
     <script>
         let currentUser = JSON.parse(localStorage.getItem('aa_user') || 'null');
-
-        async function updateUI() {
+        function updateUI() {
             if(currentUser) {
                 document.getElementById('guest-zone').classList.add('hidden');
                 document.getElementById('user-zone').classList.remove('hidden');
                 document.getElementById('post-form-container').classList.remove('hidden');
-                let welcome = `<span class="user-link" onclick="goProfile('${currentUser.userId}')">${currentUser.displayName}さん</span>`;
+                let welcome = `<span class="user-link" onclick="location.href='/profile.html?uid=${currentUser.userId}'">${currentUser.displayName}さん</span>`;
                 if(currentUser.isAdmin) welcome += ` <a href="/admin.html" style="color:red; margin-left:10px;">[管理]</a>`;
                 document.getElementById('welcome-msg').innerHTML = welcome;
                 checkNotes();
             }
         }
-
         async function checkNotes() {
             const res = await fetch('/api/notifications/' + currentUser.userId);
             const notes = await res.json();
             if(notes.length > 0) {
-                const badge = document.getElementById('note-badge');
-                badge.innerText = notes.length;
-                badge.classList.remove('hidden');
+                const b = document.getElementById('note-badge');
+                b.innerText = notes.length; b.classList.remove('hidden');
             }
         }
-
         function showNotes() {
             fetch('/api/notifications/' + currentUser.userId).then(r => r.json()).then(notes => {
-                alert("【通知一覧】\n" + notes.map(n => `・${n.message} (${new Date(n.createdAt).toLocaleString()})`).join('\n'));
+                alert(notes.length ? notes.map(n => `・${n.message}`).join('\n') : "通知はありません");
             });
         }
-
-        function goProfile(uid) { window.location.href = `/profile.html?uid=${uid}`; }
         function logout() { localStorage.removeItem('aa_user'); location.reload(); }
 
         async function loadPosts() {
@@ -77,23 +70,32 @@
             const data = await res.json();
             document.getElementById('post-list').innerHTML = data.map(p => `
                 <div class="card">
-                    <small class="user-link" onclick="goProfile('${p.userId}')">${p.author}</small> | <small>${new Date(p.createdAt).toLocaleString()}</small>
-                    <h3 style="margin:5px 0;">${p.title}</h3>
+                    <small class="user-link" onclick="location.href='/profile.html?uid=${p.userId}'">${p.author}</small> | <small>${new Date(p.createdAt).toLocaleString()}</small>
+                    <h3>${p.title}</h3>
                     <div id="content-${p.id}" class="aa-content">${p.content}</div>
                     <div class="btn-group">
-                        <button class="like-btn" onclick="likePost('${p.id}', this)">❤️ <span id="like-${p.id}">${p.likes || 0}</span></button>
-                        <button class="report-btn" onclick="reportPost('${p.id}')">🚩 通報</button>
+                        <button class="like-btn ${(currentUser && p.likedBy?.includes(currentUser.userId)) ? 'liked' : ''}" onclick="likePost('${p.id}', this)">❤️ <span id="like-${p.id}">${p.likes || 0}</span></button>
+                        <button class="report-btn" onclick="reportPost('${p.id}', '${p.userId}')">🚩 通報</button>
                     </div>
                 </div>`).join('');
         }
-
+        async function likePost(id, btn) {
+            if(!currentUser) return alert("ログインしてね");
+            const res = await fetch(`/api/posts/${id}/like`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ userId: currentUser.userId }) });
+            if(res.ok) { const d = await res.json(); document.getElementById('like-'+id).innerText = d.likes; btn.classList.add('liked'); }
+        }
+        async function reportPost(id, authorId) {
+            const reason = prompt("理由を入力:");
+            if(!reason) return;
+            await fetch('/api/report', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ postId: id, userId: currentUser.userId, reason, postAuthorId: authorId }) });
+            alert("通報完了");
+        }
         async function postAA() {
             const title = document.getElementById('title').value;
             const content = document.getElementById('content').value;
-            const res = await fetch('/api/posts', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ title, content, author: currentUser.displayName, userId: currentUser.userId }) });
+            await fetch('/api/posts', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ title, content, author: currentUser.displayName, userId: currentUser.userId }) });
             location.reload();
         }
-        
         updateUI(); loadPosts();
     </script>
 </body>
