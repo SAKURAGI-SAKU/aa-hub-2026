@@ -1,42 +1,37 @@
-import Express from "npm:express@4";
-const app = Express();
+import { Hono } from "jsr:@hono/hono";
+import { serveStatic } from "jsr:@hono/hono/deno";
+
+const app = new Hono();
 const kv = await Deno.openKv();
 
-app.use(Express.json());
-app.use(Express.static("public"));
+// 静的ファイルの提供 (publicフォルダ内)
+app.use("/*", serveStatic({ root: "./public" }));
 
-// --- BANチェック ---
-async function checkBan(req, res, next) {
-    const ip = req.headers["x-forwarded-for"] || "unknown";
-    const banEntry = await kv.get(["banned_ips", ip]);
-    if (banEntry.value) return res.status(403).json({ error: "アクセス制限中" });
-    next();
-}
-
-// --- 認証 ---
-app.post("/api/register", checkBan, async (req, res) => {
-    const { userId, password, displayName } = req.body;
-    if (!userId || !password) return res.status(400).json({ error: "入力不足" });
+// --- 認証系 ---
+app.post("/api/register", async (c) => {
+    const { userId, password, displayName } = await c.req.json();
+    if (!userId || !password) return c.json({ error: "入力不足" }, 400);
     const existing = await kv.get(["users", userId]);
-    if (existing.value) return res.status(400).json({ error: "ID重複" });
-    const ip = req.headers["x-forwarded-for"] || "unknown";
+    if (existing.value) return c.json({ error: "ID重複" }, 400);
+    
     let isFirst = true;
     for await (const _ of kv.list({ prefix: ["users"] }, { limit: 1 })) { isFirst = false; }
-    const user = { userId, password, displayName: displayName || userId, isAdmin: isFirst, ip, blockList: [] };
+    const user = { userId, password, displayName: displayName || userId, isAdmin: isFirst, blockList: [] };
     await kv.set(["users", userId], user);
-    res.json({ success: true, user });
+    return c.json({ success: true, user });
 });
 
-app.post("/api/login", checkBan, async (req, res) => {
-    const { userId, password } = req.body;
+app.post("/api/login", async (c) => {
+    const { userId, password } = await c.req.json();
     const user = await kv.get(["users", userId]);
-    if (user.value && user.value.password === password) res.json({ success: true, user: user.value });
-    else res.status(401).json({ error: "認証失敗" });
+    if (user.value && user.value.password === password) return c.json({ success: true, user: user.value });
+    return c.json({ error: "認証失敗" }, 401);
 });
 
-// --- 掲示板 ---
-app.get("/api/posts", async (req, res) => {
-    const { q, viewerId } = req.query;
+// --- 掲示板API ---
+app.get("/api/posts", async (c) => {
+    const q = c.req.query("q");
+    const viewerId = c.req.query("viewerId");
     let blockerList = [];
     if (viewerId) {
         const viewer = await kv.get(["users", viewerId]);
@@ -53,21 +48,21 @@ app.get("/api/posts", async (req, res) => {
         }
         posts.push(p);
     }
-    res.json(posts);
+    return c.json(posts);
 });
 
-app.post("/api/posts", async (req, res) => {
-    const { title, content, author, userId, tags } = req.body;
+app.post("/api/posts", async (c) => {
+    const { title, content, author, userId, tags } = await c.req.json();
     const id = Date.now().toString();
     const tagList = tags ? tags.split(',').map(t => t.trim()).filter(t => t) : [];
     const newPost = { id, title, content, author, userId, tags: tagList, likes: 0, likedBy: [], createdAt: new Date() };
     await kv.set(["posts", id], newPost);
-    res.json({ success: true });
+    return c.json({ success: true });
 });
 
-app.post("/api/posts/:id/like", async (req, res) => {
-    const { id } = req.params;
-    const { userId } = req.body;
+app.post("/api/posts/:id/like", async (c) => {
+    const id = c.req.param("id");
+    const { userId } = await c.req.json();
     const postKey = ["posts", id];
     const post = await kv.get(postKey);
     if (post.value) {
@@ -77,85 +72,88 @@ app.post("/api/posts/:id/like", async (req, res) => {
             updated.likedBy.push(userId);
             await kv.set(postKey, updated);
         }
-        res.json({ success: true, likes: updated.likes });
-    } else res.status(404).send();
+        return c.json({ success: true, likes: updated.likes });
+    }
+    return c.notFound();
 });
 
-// --- プロフィール & 通報 ---
-app.get("/api/users/:uid/posts", async (req, res) => {
+// --- プロフィール・通報 ---
+app.get("/api/users/:uid/posts", async (c) => {
+    const uid = c.req.param("uid");
     const posts = [];
     const iter = kv.list({ prefix: ["posts"] }, { reverse: true });
     for await (const entry of iter) {
-        if (entry.value.userId === req.params.uid) posts.push(entry.value);
+        if (entry.value.userId === uid) posts.push(entry.value);
     }
-    res.json(posts);
+    return c.json(posts);
 });
 
-app.post("/api/report", async (req, res) => {
-    const { postId, userId, reason, postAuthorId } = req.body;
+app.post("/api/report", async (c) => {
+    const body = await c.req.json();
     const id = Date.now().toString();
-    await kv.set(["reports", id], { id, postId, reporterId: userId, targetUserId: postAuthorId, reason, createdAt: new Date() });
-    res.json({ success: true });
+    await kv.set(["reports", id], { ...body, id, createdAt: new Date() });
+    return c.json({ success: true });
 });
 
-// --- 通知 ---
-app.get("/api/emergency", async (req, res) => {
+// --- 通知・管理 ---
+app.get("/api/emergency", async (c) => {
     const entry = await kv.get(["emergency_message"]);
-    res.json(entry.value || null);
+    return c.json(entry.value || null);
 });
 
-app.get("/api/notifications/:userId", async (req, res) => {
+app.get("/api/notifications/:userId", async (c) => {
+    const userId = c.req.param("userId");
     const notes = [];
-    const iter = kv.list({ prefix: ["notifications", req.params.userId] }, { reverse: true });
+    const iter = kv.list({ prefix: ["notifications", userId] }, { reverse: true });
     for await (const entry of iter) {
         if (!entry.value.read) notes.push(entry.value);
     }
-    res.json(notes);
+    return c.json(notes);
 });
 
-app.post("/api/notifications/read", async (req, res) => {
-    const { userId } = req.body;
+app.post("/api/notifications/read", async (c) => {
+    const { userId } = await c.req.json();
     const iter = kv.list({ prefix: ["notifications", userId] });
     for await (const entry of iter) {
         const note = entry.value;
         note.read = true;
         await kv.set(entry.key, note);
     }
-    res.json({ success: true });
+    return c.json({ success: true });
 });
 
-// --- 管理者専用 ---
-app.post("/api/admin/emergency", async (req, res) => {
-    const { adminId, message } = req.body;
+app.post("/api/admin/emergency", async (c) => {
+    const { adminId, message } = await c.req.json();
     const admin = await kv.get(["users", adminId]);
-    if (!admin.value?.isAdmin) return res.status(403).send();
+    if (!admin.value?.isAdmin) return c.json({ error: "Forbidden" }, 403);
     await kv.set(["emergency_message"], { message, createdAt: new Date().getTime().toString() });
-    res.json({ success: true });
+    return c.json({ success: true });
 });
 
-app.post("/api/admin/notify", async (req, res) => {
-    const { adminId, targetUserId, message, isEmergency } = req.body;
+app.post("/api/admin/notify", async (c) => {
+    const { adminId, targetUserId, message, isEmergency } = await c.req.json();
     const admin = await kv.get(["users", adminId]);
-    if (!admin.value?.isAdmin) return res.status(403).send();
+    if (!admin.value?.isAdmin) return c.json({ error: "Forbidden" }, 403);
     const id = Date.now().toString();
     await kv.set(["notifications", targetUserId, id], { id, message, createdAt: new Date().getTime().toString(), read: false, isEmergency: !!isEmergency });
-    res.json({ success: true });
+    return c.json({ success: true });
 });
 
-app.post("/api/admin/delete", async (req, res) => {
-    const { postId, adminId } = req.body;
+app.post("/api/admin/delete", async (c) => {
+    const { postId, adminId } = await c.req.json();
     const admin = await kv.get(["users", adminId]);
     if (admin.value?.isAdmin) {
         await kv.delete(["posts", postId]);
-        res.json({ success: true });
-    } else res.status(403).send();
+        return c.json({ success: true });
+    }
+    return c.json({ error: "Forbidden" }, 403);
 });
 
-app.get("/api/admin/reports", async (req, res) => {
+app.get("/api/admin/reports", async (c) => {
     const reports = [];
     const iter = kv.list({ prefix: ["reports"] }, { reverse: true });
     for await (const entry of iter) { reports.push(entry.value); }
-    res.json(reports);
+    return c.json(reports);
 });
 
-app.listen(8000);
+Deno.serve(app.fetch);
