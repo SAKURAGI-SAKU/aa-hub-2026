@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AA HUB 2026</title>
     <style>
-        /* 既存のスタイルを維持しつつ通知リスト用を追加 */
+        /* (既存のスタイル) */
         :root { --bg: #f4f7f6; --card-bg: #ffffff; --text: #2d3436; --border: #dfe6e9; --accent: #0984e3; --secondary: #636e72; --aa-bg: #ffffff; --liked-color: #ff4757; --report-color: #e17055; --emergency-bg: #ff7675; }
         body.dark { --bg: #1e272e; --card-bg: #2f3542; --text: #f1f2f6; --border: #57606f; --accent: #70a1ff; --secondary: #a4b0be; --aa-bg: #1e272e; --liked-color: #ff6b81; --report-color: #fab1a0; }
         body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', sans-serif; transition: 0.3s; margin: 0; padding: 20px; }
@@ -20,16 +20,13 @@
         .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--secondary); font-size: 12px; }
         .tag { color: var(--accent); font-size: 13px; margin-right: 8px; cursor: pointer; }
         .badge { background: #ff4757; color: white; padding: 2px 7px; border-radius: 10px; font-size: 10px; position: relative; top: -10px; left: -5px; }
-        .hidden { display: none; }
-        
-        /* 通知セクションの新しいデザイン */
+        .hidden { display: none !important; }
         #notification-box { background: #fff9db; border: 1px solid #fab005; border-radius: 12px; padding: 20px; margin-bottom: 20px; color: #333; }
         body.dark #notification-box { background: #3e3b2e; border-color: #fab005; color: #eee; }
         .note-item { padding: 10px 0; border-bottom: 1px solid rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center; }
-        
         #profile-popup { position: fixed; right: 20px; top: 70px; background: var(--card-bg); border: 1px solid var(--border); padding: 15px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); z-index: 100; }
         .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); display: flex; justify-content: center; align-items: center; z-index: 1000; }
-        .modal-content { background: var(--card-bg); padding: 30px; border-radius: 15px; max-width: 500px; width: 90%; text-align: center; }
+        .modal-content { background: var(--card-bg); padding: 30px; border-radius: 15px; max-width: 500px; width: 90%; text-align: center; color: var(--text); }
     </style>
 </head>
 <body class="light">
@@ -63,7 +60,6 @@
             <div id="admin-link-popup" class="hidden" style="margin-top:10px;"><a href="/admin.html" style="color:red; font-weight:bold;">[管理パネル]</a></div>
         </div>
 
-        <!-- 通知リスト表示セクション -->
         <div id="notification-box" class="hidden">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
                 <h3 style="margin:0">✉️ あなたへのメッセージ</h3>
@@ -72,17 +68,16 @@
             <div id="note-list"></div>
         </div>
 
-        <!-- 検索・投稿フォーム -->
         <div class="search-bar" style="display:flex; gap:10px; margin-bottom:20px;">
             <input id="search-input" placeholder="キーワード検索...">
             <button onclick="loadPosts(document.getElementById('search-input').value)" class="btn btn-primary">検索</button>
         </div>
 
         <div id="post-form" class="card hidden">
-            <input id="title" placeholder="作品のタイトル">
-            <textarea id="content" placeholder="ここにAAを貼り付け" rows="6"></textarea>
+            <input id="title" placeholder="タイトル">
+            <textarea id="content" placeholder="AAを貼り付け" rows="6"></textarea>
             <input id="tags" placeholder="タグ（カンマ区切り）">
-            <button onclick="postAA()" id="submit-btn" class="btn btn-primary" style="width:100%">作品を投稿する</button>
+            <button onclick="postAA()" id="submit-btn" class="btn btn-primary" style="width:100%">投稿する</button>
         </div>
 
         <div id="post-list">読み込み中...</div>
@@ -95,7 +90,6 @@
         if(localStorage.getItem('theme') === 'dark') document.body.classList.add('dark');
         function toggleProfilePopup() { document.getElementById('profile-popup').classList.toggle('hidden'); }
 
-        // 通知リストの出し入れ
         async function toggleNotifications() {
             const box = document.getElementById('notification-box');
             if (box.classList.contains('hidden')) {
@@ -107,9 +101,7 @@
                         <small style="color:var(--secondary)">${new Date(n.createdAt).toLocaleDateString()}</small>
                     </div>`).join('') || "新しい通知はありません";
                 box.classList.remove('hidden');
-            } else {
-                box.classList.add('hidden');
-            }
+            } else { box.classList.add('hidden'); }
         }
 
         async function closeNotes() {
@@ -128,26 +120,38 @@
                 document.getElementById('popup-user-id').innerText = `@${currentUser.userId}`;
                 if(currentUser.isAdmin) document.getElementById('admin-link-popup').classList.remove('hidden');
                 
-                // 通知バッジの確認
-                const nRes = await fetch('/api/notifications/' + currentUser.userId);
-                const notes = await nRes.json();
-                if(notes.length > 0) {
-                    const b = document.getElementById('note-badge');
-                    b.innerText = notes.length; b.classList.remove('hidden');
-                }
-                
-                // 緊急告知の確認
-                const eRes = await fetch('/api/emergency');
-                const data = await eRes.json();
-                if (data && localStorage.getItem('last_emergency') !== data.createdAt) {
-                    document.getElementById('emergency-text').innerText = data.message;
-                    document.getElementById('emergency-modal').classList.remove('hidden');
-                    localStorage.setItem('temp_emergency_id', data.createdAt);
-                }
+                checkNotes();
+                checkEmergency();
             }
         }
 
-        function closeEmergency() { localStorage.setItem('last_emergency', localStorage.getItem('temp_emergency_id')); document.getElementById('emergency-modal').classList.add('hidden'); }
+        async function checkEmergency() {
+            const res = await fetch('/api/emergency');
+            const data = await res.json();
+            // データが存在し、かつメッセージが空でなく、かつまだこのIDを「確認済み」にしていない場合のみ表示
+            if (data && data.message && localStorage.getItem('last_emergency_id') !== data.createdAt) {
+                document.getElementById('emergency-text').innerText = data.message;
+                document.getElementById('emergency-modal').classList.remove('hidden');
+                // 一時的にこのIDを保持
+                window.currentEmergencyId = data.createdAt;
+            }
+        }
+        function closeEmergency() {
+            if (window.currentEmergencyId) {
+                localStorage.setItem('last_emergency_id', window.currentEmergencyId);
+            }
+            document.getElementById('emergency-modal').classList.add('hidden');
+        }
+
+        async function checkNotes() {
+            if(!currentUser) return;
+            const res = await fetch('/api/notifications/' + currentUser.userId);
+            const notes = await res.json();
+            if(notes.length > 0) {
+                const b = document.getElementById('note-badge');
+                b.innerText = notes.length; b.classList.remove('hidden');
+            }
+        }
 
         async function loadPosts(query = '') {
             const url = `/api/posts?q=${encodeURIComponent(query)}&viewerId=${currentUser?.userId || ''}`;
@@ -178,7 +182,6 @@
             const res = await fetch(`/api/posts/${id}/like`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ userId: currentUser.userId }) });
             if(res.ok) { const d = await res.json(); document.getElementById('l-'+id).innerText = d.likes; btn.style.background = "var(--liked-color)"; btn.style.color = "white"; }
         }
-
         async function postAA() {
             const btn = document.getElementById('submit-btn');
             const title = document.getElementById('title').value;
@@ -189,9 +192,8 @@
             await fetch('/api/posts', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ title, content, tags, author: currentUser.displayName, userId: currentUser.userId }) });
             setTimeout(() => location.reload(), 500);
         }
-
         function reportPost(id, authorId) { const r = prompt("通報理由:"); if(r) fetch('/api/report', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ postId: id, userId: currentUser.userId, reason: r, postAuthorId: authorId }) }).then(() => alert("通報しました")); }
-        function blockUser(tid) { if(confirm("このユーザーの投稿を非表示にしますか？")) fetch('/api/user/block', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({userId:currentUser.userId, targetId:tid}) }).then(() => location.reload()); }
+        function blockUser(tid) { if(confirm("非表示にしますか？")) fetch('/api/user/block', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({userId:currentUser.userId, targetId:tid}) }).then(() => location.reload()); }
         function deletePost(id) { if(confirm("削除しますか？")) fetch('/api/admin/delete', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({postId:id, adminId:currentUser.userId}) }).then(() => loadPosts()); }
         function logout() { localStorage.removeItem('aa_user'); location.reload(); }
         
