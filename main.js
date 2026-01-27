@@ -1,11 +1,11 @@
-import Express from "npm:express@4.18.2";
+import Express from "npm:express@4";
 const app = Express();
 const kv = await Deno.openKv();
 
 app.use(Express.json());
 app.use(Express.static("public"));
 
-// --- BANチェックヘルパー ---
+// --- BANチェック ---
 async function checkBan(req, res, next) {
     const ip = req.headers["x-forwarded-for"] || "unknown";
     const banEntry = await kv.get(["banned_ips", ip]);
@@ -13,17 +13,15 @@ async function checkBan(req, res, next) {
     next();
 }
 
-// --- 認証系 ---
+// --- 認証 ---
 app.post("/api/register", checkBan, async (req, res) => {
     const { userId, password, displayName } = req.body;
-    if (!userId || !password) return res.status(400).json({ error: "入力が不足しています" });
+    if (!userId || !password) return res.status(400).json({ error: "入力不足" });
     const existing = await kv.get(["users", userId]);
-    if (existing.value) return res.status(400).json({ error: "このIDは既に使用されています" });
-    
+    if (existing.value) return res.status(400).json({ error: "ID重複" });
     const ip = req.headers["x-forwarded-for"] || "unknown";
     let isFirst = true;
     for await (const _ of kv.list({ prefix: ["users"] }, { limit: 1 })) { isFirst = false; }
-    
     const user = { userId, password, displayName: displayName || userId, isAdmin: isFirst, ip, blockList: [] };
     await kv.set(["users", userId], user);
     res.json({ success: true, user });
@@ -32,14 +30,11 @@ app.post("/api/register", checkBan, async (req, res) => {
 app.post("/api/login", checkBan, async (req, res) => {
     const { userId, password } = req.body;
     const user = await kv.get(["users", userId]);
-    if (user.value && user.value.password === password) {
-        res.json({ success: true, user: user.value });
-    } else {
-        res.status(401).json({ error: "IDまたはパスワードが間違っています" });
-    }
+    if (user.value && user.value.password === password) res.json({ success: true, user: user.value });
+    else res.status(401).json({ error: "認証失敗" });
 });
 
-// --- 掲示板API ---
+// --- 掲示板 ---
 app.get("/api/posts", async (req, res) => {
     const { q, viewerId } = req.query;
     let blockerList = [];
@@ -86,7 +81,7 @@ app.post("/api/posts/:id/like", async (req, res) => {
     } else res.status(404).send();
 });
 
-// --- ユーザープロフィール・通報API ---
+// --- プロフィール & 通報 ---
 app.get("/api/users/:uid/posts", async (req, res) => {
     const posts = [];
     const iter = kv.list({ prefix: ["posts"] }, { reverse: true });
@@ -103,7 +98,7 @@ app.post("/api/report", async (req, res) => {
     res.json({ success: true });
 });
 
-// --- 通知・緊急メッセージ ---
+// --- 通知 ---
 app.get("/api/emergency", async (req, res) => {
     const entry = await kv.get(["emergency_message"]);
     res.json(entry.value || null);
@@ -129,7 +124,7 @@ app.post("/api/notifications/read", async (req, res) => {
     res.json({ success: true });
 });
 
-// --- 管理者用API ---
+// --- 管理者専用 ---
 app.post("/api/admin/emergency", async (req, res) => {
     const { adminId, message } = req.body;
     const admin = await kv.get(["users", adminId]);
@@ -153,9 +148,7 @@ app.post("/api/admin/delete", async (req, res) => {
     if (admin.value?.isAdmin) {
         await kv.delete(["posts", postId]);
         res.json({ success: true });
-    } else {
-        res.status(403).send();
-    }
+    } else res.status(403).send();
 });
 
 app.get("/api/admin/reports", async (req, res) => {
