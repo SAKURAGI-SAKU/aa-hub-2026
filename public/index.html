@@ -19,6 +19,7 @@
         input, textarea { width: 100%; box-sizing: border-box; margin-bottom: 10px; padding: 10px; border: 1px solid #ccc; border-radius: 4px; }
         .search-bar { margin-bottom: 20px; display: flex; gap: 10px; }
         .main-btn { width: 100%; padding: 12px; background: #1e90ff; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
+        .main-btn:disabled { background: #ccc; cursor: wait; }
     </style>
 </head>
 <body>
@@ -44,7 +45,7 @@
         <input id="tags" placeholder="タグ（カンマ区切り：モナー, ギコ, 長編）">
         <button id="submit-btn" onclick="postAA()" class="main-btn">投稿する</button>
     </div>
-    <div id="post-list"></div>
+    <div id="post-list">読み込み中...</div>
 
     <script>
         let currentUser = JSON.parse(localStorage.getItem('aa_user') || 'null');
@@ -80,14 +81,14 @@
             document.getElementById('post-list').innerHTML = data.map(p => `
                 <div class="card">
                     <small class="user-link" onclick="location.href='/profile.html?uid=${p.userId}'">${p.author}</small> | <small>${new Date(p.createdAt).toLocaleString()}</small>
-                    <h3>${p.title}</h3>
+                    <h3 style="margin:5px 0;">${p.title}</h3>
                     <div>${(p.tags || []).map(t => `<span class="tag" onclick="loadPosts('${t}')">#${t}</span>`).join('')}</div>
                     <div id="content-${p.id}" class="aa-content" style="margin-top:10px">${p.content}</div>
                     <div class="btn-group">
                         <button class="like-btn ${(currentUser && p.likedBy?.includes(currentUser.userId)) ? 'liked' : ''}" onclick="likePost('${p.id}', this)">❤️ <span id="like-${p.id}">${p.likes || 0}</span></button>
                         <button class="report-btn" onclick="reportPost('${p.id}', '${p.userId}')">🚩 通報</button>
                     </div>
-                </div>`).join('');
+                </div>`).join('') || "投稿がありません。";
         }
         async function likePost(id, btn) {
             if(!currentUser) return alert("ログインしてね");
@@ -100,13 +101,34 @@
             await fetch('/api/report', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ postId: id, userId: currentUser.userId, reason, postAuthorId: authorId }) });
             alert("通報完了");
         }
+
         async function postAA() {
+            const btn = document.getElementById('submit-btn');
             const title = document.getElementById('title').value;
             const content = document.getElementById('content').value;
             const tags = document.getElementById('tags').value;
             if(!title || !content) return alert("入力してください");
-            await fetch('/api/posts', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ title, content, tags, author: currentUser.displayName, userId: currentUser.userId }) });
-            location.reload();
+            
+            btn.disabled = true;
+            btn.innerText = "送信中...";
+
+            const res = await fetch('/api/posts', { 
+                method: 'POST', 
+                headers: {'Content-Type': 'application/json'}, 
+                body: JSON.stringify({ title, content, tags, author: currentUser.displayName, userId: currentUser.userId }) 
+            });
+            
+            if (res.ok) {
+                // データベースの反映を待つため少しだけ待機してからリロード
+                setTimeout(() => {
+                    location.reload();
+                }, 500);
+            } else {
+                const err = await res.json();
+                alert(err.error || "投稿に失敗しました");
+                btn.disabled = false;
+                btn.innerText = "投稿する";
+            }
         }
         updateUI(); loadPosts();
     </script>
