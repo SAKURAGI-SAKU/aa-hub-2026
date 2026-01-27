@@ -12,11 +12,13 @@
         .hidden { display: none; }
         .badge { background: red; color: white; border-radius: 10px; padding: 2px 6px; font-size: 10px; position: relative; top: -10px; left: -5px; }
         .user-link { color: #1e90ff; text-decoration: none; font-weight: bold; cursor: pointer; }
+        .tag { display: inline-block; background: #e1f5fe; color: #0288d1; padding: 2px 8px; border-radius: 15px; font-size: 12px; margin-right: 5px; cursor: pointer; }
         .btn-group { margin-top: 10px; display: flex; gap: 10px; }
         .like-btn, .report-btn { border: 1px solid #ddd; background: white; border-radius: 20px; padding: 5px 15px; cursor: pointer; }
         .like-btn.liked { background: #ff4757; color: white; border-color: #ff4757; }
         input, textarea { width: 100%; box-sizing: border-box; margin-bottom: 10px; padding: 10px; border: 1px solid #ccc; border-radius: 4px; }
-        .main-btn { width: 100%; padding: 12px; background: #1e90ff; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        .search-bar { margin-bottom: 20px; display: flex; gap: 10px; }
+        .main-btn { width: 100%; padding: 12px; background: #1e90ff; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -31,8 +33,15 @@
         </div>
     </div>
 
+    <div class="search-bar">
+        <input id="search-input" placeholder="キーワード検索（作品・タグ）" style="margin-bottom:0">
+        <button onclick="loadPosts(document.getElementById('search-input').value)" style="padding:0 20px; border-radius:4px; border:1px solid #ccc; cursor:pointer;">検索</button>
+    </div>
+
     <div id="post-form-container" class="card hidden">
-        <input id="title" placeholder="タイトル"><textarea id="content" placeholder="AAを貼り付け" rows="5"></textarea>
+        <input id="title" placeholder="タイトル">
+        <textarea id="content" placeholder="AAを貼り付け" rows="5"></textarea>
+        <input id="tags" placeholder="タグ（カンマ区切り：モナー, ギコ, 長編）">
         <button id="submit-btn" onclick="postAA()" class="main-btn">投稿する</button>
     </div>
     <div id="post-list"></div>
@@ -65,14 +74,15 @@
         }
         function logout() { localStorage.removeItem('aa_user'); location.reload(); }
 
-        async function loadPosts() {
-            const res = await fetch('/api/posts');
+        async function loadPosts(query = '') {
+            const res = await fetch('/api/posts?q=' + encodeURIComponent(query));
             const data = await res.json();
             document.getElementById('post-list').innerHTML = data.map(p => `
                 <div class="card">
                     <small class="user-link" onclick="location.href='/profile.html?uid=${p.userId}'">${p.author}</small> | <small>${new Date(p.createdAt).toLocaleString()}</small>
                     <h3>${p.title}</h3>
-                    <div id="content-${p.id}" class="aa-content">${p.content}</div>
+                    <div>${(p.tags || []).map(t => `<span class="tag" onclick="loadPosts('${t}')">#${t}</span>`).join('')}</div>
+                    <div id="content-${p.id}" class="aa-content" style="margin-top:10px">${p.content}</div>
                     <div class="btn-group">
                         <button class="like-btn ${(currentUser && p.likedBy?.includes(currentUser.userId)) ? 'liked' : ''}" onclick="likePost('${p.id}', this)">❤️ <span id="like-${p.id}">${p.likes || 0}</span></button>
                         <button class="report-btn" onclick="reportPost('${p.id}', '${p.userId}')">🚩 通報</button>
@@ -93,7 +103,9 @@
         async function postAA() {
             const title = document.getElementById('title').value;
             const content = document.getElementById('content').value;
-            await fetch('/api/posts', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ title, content, author: currentUser.displayName, userId: currentUser.userId }) });
+            const tags = document.getElementById('tags').value;
+            if(!title || !content) return alert("入力してください");
+            await fetch('/api/posts', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ title, content, tags, author: currentUser.displayName, userId: currentUser.userId }) });
             location.reload();
         }
         updateUI(); loadPosts();
