@@ -1,5 +1,5 @@
-import { Hono } from "jsr:@hono/hono";
-import { serveStatic } from "jsr:@hono/hono/deno";
+import { Hono } from "https://deno.land";
+import { serveStatic } from "https://deno.land";
 
 const app = new Hono();
 const kv = await Deno.openKv();
