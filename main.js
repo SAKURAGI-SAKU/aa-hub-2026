@@ -5,7 +5,7 @@ const kv = await Deno.openKv();
 app.use(Express.json());
 app.use(Express.static("public"));
 
-// --- ヘルパー: BANチェック ---
+// --- BANチェック用ヘルパー ---
 async function checkBan(req, res, next) {
     const ip = req.headers["x-forwarded-for"] || "unknown";
     const banEntry = await kv.get(["banned_ips", ip]);
@@ -19,12 +19,10 @@ app.post("/api/register", checkBan, async (req, res) => {
     if(!userId || !password) return res.status(400).json({ error: "IDとPWは必須です" });
     const existing = await kv.get(["users", userId]);
     if (existing.value) return res.status(400).json({ error: "既に存在するIDです" });
-    
     const ip = req.headers["x-forwarded-for"] || "unknown";
     let isFirst = true;
     const iter = kv.list({ prefix: ["users"] }, { limit: 1 });
     for await (const _ of iter) { isFirst = false; }
-    
     const user = { userId, password, displayName: displayName || userId, isAdmin: isFirst, ip: ip, blockList: [] };
     await kv.set(["users", userId], user);
     res.json({ success: true, user });
@@ -135,7 +133,12 @@ app.post("/api/admin/emergency", async (req, res) => {
     const { adminId, message } = req.body;
     const admin = await kv.get(["users", adminId]);
     if (!admin.value || !admin.value.isAdmin) return res.status(403).send();
-    await kv.set(["emergency_message"], { message, createdAt: new Date().toISOString() });
+    // 告知を削除したい場合はmessageを空文字で送る
+    if (!message) {
+        await kv.delete(["emergency_message"]);
+    } else {
+        await kv.set(["emergency_message"], { message, createdAt: new Date().getTime().toString() });
+    }
     res.json({ success: true });
 });
 
