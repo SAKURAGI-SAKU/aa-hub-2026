@@ -1,33 +1,26 @@
 import Express from "npm:express@4.18.2";
-import path from "node:path";
-
 const app = Express();
+
+// データベース(Deno KV)を安全に開く
 const kv = await Deno.openKv();
 
 app.use(Express.json());
-
-// publicフォルダの中身を自動的に公開する設定
 app.use(Express.static("public"));
 
-// --- APIルート (前回の内容を維持) ---
-
-// ユーザー登録
+// --- ユーザー認証API ---
 app.post("/api/register", async (req, res) => {
     const { userId, password, displayName } = req.body;
-    if(!userId || !password) return res.status(400).json({ error: "入力が足りません" });
-
+    if(!userId || !password) return res.status(400).json({ error: "IDとPWは必須です" });
     const existing = await kv.get(["users", userId]);
     if (existing.value) return res.status(400).json({ error: "既に存在するIDです" });
     
     let isFirst = true;
     for await (const _ of kv.list({ prefix: ["users"] }, { limit: 1 })) { isFirst = false; }
-
     const user = { userId, password, displayName: displayName || userId, isAdmin: isFirst };
     await kv.set(["users", userId], user);
     res.json({ success: true, user });
 });
 
-// ログイン
 app.post("/api/login", async (req, res) => {
     const { userId, password } = req.body;
     const user = await kv.get(["users", userId]);
@@ -38,7 +31,7 @@ app.post("/api/login", async (req, res) => {
     }
 });
 
-// 投稿一覧
+// --- 掲示板API ---
 app.get("/api/posts", async (req, res) => {
     const posts = [];
     const iter = kv.list({ prefix: ["posts"] }, { reverse: true });
@@ -46,14 +39,25 @@ app.get("/api/posts", async (req, res) => {
     res.json(posts);
 });
 
-// 投稿保存
 app.post("/api/posts", async (req, res) => {
     const { title, content, author } = req.body;
     const id = Date.now().toString();
-    const newPost = { id, title, content, author, createdAt: new Date() };
+    const newPost = { id, title, content, author, likes: 0, createdAt: new Date() };
     await kv.set(["posts", id], newPost);
     res.json({ success: true });
 });
 
-// サーバー起動
+app.post("/api/posts/:id/like", async (req, res) => {
+    const { id } = req.params;
+    const post = await kv.get(["posts", id]);
+    if (post.value) {
+        const updated = post.value;
+        updated.likes = (updated.likes || 0) + 1;
+        await kv.set(["posts", id], updated);
+        res.json({ success: true, likes: updated.likes });
+    } else {
+        res.status(404).send();
+    }
+});
+
 app.listen(8000);
