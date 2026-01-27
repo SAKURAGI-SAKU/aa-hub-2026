@@ -2,64 +2,87 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AA HUB 2026</title>
     <style>
-        body { font-family: sans-serif; background: #f4f4f9; padding: 20px; max-width: 900px; margin: 0 auto; }
-        .card { background: white; padding: 15px; margin-bottom: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        .aa-content { font-family: "Mona", "MS PGothic", "ＭＳ Ｐゴシック", sans-serif; font-size: 16px; line-height: 1.1; white-space: pre; overflow: hidden; max-height: 300px; transition: max-height 0.3s; background: #fff; padding: 15px; border: 1px solid #ddd; overflow-x: auto;}
+        :root {
+            --bg: #f4f7f6; --card-bg: #ffffff; --text: #2d3436; --border: #dfe6e9;
+            --accent: #0984e3; --secondary: #636e72; --aa-bg: #ffffff;
+        }
+        body.dark {
+            --bg: #1e272e; --card-bg: #2f3542; --text: #f1f2f6; --border: #57606f;
+            --accent: #70a1ff; --secondary: #a4b0be; --aa-bg: #1e272e;
+        }
+        body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', sans-serif; transition: 0.3s; margin: 0; padding: 20px; }
+        .container { max-width: 800px; margin: 0 auto; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
+        .card { background: var(--card-bg); padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 20px; border: 1px solid var(--border); }
+        .aa-content { 
+            font-family: "Mona", "MS PGothic", "ＭＳ Ｐゴシック", sans-serif; font-size: 16px; line-height: 1.1; 
+            white-space: pre; overflow-x: auto; background: var(--aa-bg); padding: 15px; border-radius: 8px;
+            border: 1px solid var(--border); max-height: 300px; transition: 0.3s;
+        }
         .aa-content.expanded { max-height: none; }
-        #auth-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        input, textarea { width: 100%; box-sizing: border-box; background: var(--aa-bg); color: var(--text); border: 1px solid var(--border); padding: 12px; border-radius: 8px; margin-bottom: 10px; }
+        .btn { border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: bold; transition: 0.2s; }
+        .btn-primary { background: var(--accent); color: white; }
+        .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--secondary); font-size: 12px; }
+        .tag { color: var(--accent); font-size: 13px; margin-right: 8px; cursor: pointer; }
+        .badge { background: #ff4757; color: white; padding: 2px 7px; border-radius: 10px; font-size: 11px; }
         .hidden { display: none; }
-        .badge { background: red; color: white; border-radius: 10px; padding: 2px 6px; font-size: 10px; position: relative; top: -10px; left: -5px; }
-        .user-link { color: #1e90ff; text-decoration: none; font-weight: bold; cursor: pointer; }
-        .tag { display: inline-block; background: #e1f5fe; color: #0288d1; padding: 2px 8px; border-radius: 15px; font-size: 12px; margin-right: 5px; cursor: pointer; }
-        .btn-group { margin-top: 10px; display: flex; gap: 10px; }
-        .like-btn, .report-btn { border: 1px solid #ddd; background: white; border-radius: 20px; padding: 5px 15px; cursor: pointer; }
-        .like-btn.liked { background: #ff4757; color: white; border-color: #ff4757; }
-        input, textarea { width: 100%; box-sizing: border-box; margin-bottom: 10px; padding: 10px; border: 1px solid #ccc; border-radius: 4px; }
-        .search-bar { margin-bottom: 20px; display: flex; gap: 10px; }
-        .main-btn { width: 100%; padding: 12px; background: #1e90ff; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
-        .main-btn:disabled { background: #ccc; cursor: wait; }
     </style>
 </head>
-<body>
-    <div id="auth-header">
-        <h1>AA HUB 2026</h1>
-        <div id="auth-zone">
-            <div id="guest-zone"><a href="/login.html">ログイン / 新規登録</a></div>
-            <div id="user-zone" class="hidden">
-                <span onclick="showNotes()" style="cursor:pointer; margin-right:15px;">✉️<span id="note-badge" class="badge hidden">0</span></span>
-                <span id="welcome-msg"></span> | <a href="#" onclick="logout()">ログアウト</a>
+<body class="light">
+    <div class="container">
+        <div class="header">
+            <h1>AA HUB 2026</h1>
+            <div>
+                <button class="btn btn-outline" onclick="toggleTheme()">🌓 モード切替</button>
+                <span id="user-zone" class="hidden" style="margin-left:10px">
+                    <span id="note-icon" onclick="showNotes()" style="cursor:pointer">✉️<span id="note-badge" class="badge hidden">0</span></span>
+                    <span id="welcome-msg" class="user-link"></span>
+                    <button class="btn btn-outline" onclick="logout()">切断</button>
+                </span>
+                <span id="guest-zone"><a href="/login.html" class="btn btn-primary" style="text-decoration:none">ログイン</a></span>
             </div>
         </div>
-    </div>
 
-    <div class="search-bar">
-        <input id="search-input" placeholder="キーワード検索（作品・タグ）" style="margin-bottom:0">
-        <button onclick="loadPosts(document.getElementById('search-input').value)" style="padding:0 20px; border-radius:4px; border:1px solid #ccc; cursor:pointer;">検索</button>
-    </div>
+        <div class="search-bar" style="display:flex; gap:10px; margin-bottom:20px;">
+            <input id="search-input" placeholder="AAを探す..." style="margin:0">
+            <button onclick="loadPosts(document.getElementById('search-input').value)" class="btn btn-primary">検索</button>
+        </div>
 
-    <div id="post-form-container" class="card hidden">
-        <input id="title" placeholder="タイトル">
-        <textarea id="content" placeholder="AAを貼り付け" rows="5"></textarea>
-        <input id="tags" placeholder="タグ（カンマ区切り：モナー, ギコ, 長編）">
-        <button id="submit-btn" onclick="postAA()" class="main-btn">投稿する</button>
+        <div id="post-form" class="card hidden">
+            <input id="title" placeholder="タイトル">
+            <textarea id="content" placeholder="AAを貼り付け" rows="6"></textarea>
+            <input id="tags" placeholder="タグ（カンマ区切り）">
+            <button onclick="postAA()" id="submit-btn" class="btn btn-primary" style="width:100%">投稿する</button>
+        </div>
+
+        <div id="post-list"></div>
     </div>
-    <div id="post-list">読み込み中...</div>
 
     <script>
         let currentUser = JSON.parse(localStorage.getItem('aa_user') || 'null');
+        
+        function toggleTheme() {
+            document.body.classList.toggle('dark');
+            localStorage.setItem('theme', document.body.classList.contains('dark') ? 'dark' : 'light');
+        }
+        if(localStorage.getItem('theme') === 'dark') document.body.classList.add('dark');
+
         function updateUI() {
             if(currentUser) {
                 document.getElementById('guest-zone').classList.add('hidden');
                 document.getElementById('user-zone').classList.remove('hidden');
-                document.getElementById('post-form-container').classList.remove('hidden');
-                let welcome = `<span class="user-link" onclick="location.href='/profile.html?uid=${currentUser.userId}'">${currentUser.displayName}さん</span>`;
-                if(currentUser.isAdmin) welcome += ` <a href="/admin.html" style="color:red; margin-left:10px;">[管理]</a>`;
+                document.getElementById('post-form').classList.remove('hidden');
+                let welcome = `<span onclick="location.href='/profile.html?uid=${currentUser.userId}'" style="cursor:pointer">${currentUser.displayName}</span>`;
+                if(currentUser.isAdmin) welcome += ` <a href="/admin.html" style="color:red">[管]</a>`;
                 document.getElementById('welcome-msg').innerHTML = welcome;
                 checkNotes();
             }
         }
+
         async function checkNotes() {
             const res = await fetch('/api/notifications/' + currentUser.userId);
             const notes = await res.json();
@@ -68,38 +91,40 @@
                 b.innerText = notes.length; b.classList.remove('hidden');
             }
         }
-        function showNotes() {
-            fetch('/api/notifications/' + currentUser.userId).then(r => r.json()).then(notes => {
-                alert(notes.length ? notes.map(n => `・${n.message}`).join('\n') : "通知はありません");
-            });
-        }
-        function logout() { localStorage.removeItem('aa_user'); location.reload(); }
 
         async function loadPosts(query = '') {
-            const res = await fetch('/api/posts?q=' + encodeURIComponent(query));
+            const url = `/api/posts?q=${encodeURIComponent(query)}&viewerId=${currentUser?.userId || ''}`;
+            const res = await fetch(url);
             const data = await res.json();
             document.getElementById('post-list').innerHTML = data.map(p => `
                 <div class="card">
-                    <small class="user-link" onclick="location.href='/profile.html?uid=${p.userId}'">${p.author}</small> | <small>${new Date(p.createdAt).toLocaleString()}</small>
-                    <h3 style="margin:5px 0;">${p.title}</h3>
-                    <div>${(p.tags || []).map(t => `<span class="tag" onclick="loadPosts('${t}')">#${t}</span>`).join('')}</div>
-                    <div id="content-${p.id}" class="aa-content" style="margin-top:10px">${p.content}</div>
-                    <div class="btn-group">
-                        <button class="like-btn ${(currentUser && p.likedBy?.includes(currentUser.userId)) ? 'liked' : ''}" onclick="likePost('${p.id}', this)">❤️ <span id="like-${p.id}">${p.likes || 0}</span></button>
-                        <button class="report-btn" onclick="reportPost('${p.id}', '${p.userId}')">🚩 通報</button>
+                    <div style="display:flex; justify-content:space-between">
+                        <small class="tag" onclick="location.href='/profile.html?uid=${p.userId}'">${p.author}</small>
+                        <div>
+                            ${(currentUser && currentUser.isAdmin) ? `<button class="btn btn-outline" style="color:red" onclick="deletePost('${p.id}')">消去</button>` : ''}
+                            ${(currentUser && currentUser.userId !== p.userId) ? `<button class="btn btn-outline" onclick="blockUser('${p.userId}')">ブロック</button>` : ''}
+                        </div>
                     </div>
-                </div>`).join('') || "投稿がありません。";
+                    <h3 style="margin:10px 0">${p.title}</h3>
+                    <div>${(p.tags || []).map(t => `<span class="tag" onclick="loadPosts('${t}')">#${t}</span>`).join('')}</div>
+                    <div id="c-${p.id}" class="aa-content" style="margin-top:15px">${p.content}</div>
+                    <div style="margin-top:15px; display:flex; gap:10px">
+                        <button class="btn btn-outline" onclick="likePost('${p.id}', this)">❤️ <span id="l-${p.id}">${p.likes || 0}</span></button>
+                        <button class="btn btn-outline" onclick="reportPost('${p.id}', '${p.userId}')">🚩</button>
+                        <button class="btn btn-outline" onclick="document.getElementById('c-${p.id}').classList.toggle('expanded')">展開/縮小</button>
+                    </div>
+                </div>`).join('');
         }
-        async function likePost(id, btn) {
-            if(!currentUser) return alert("ログインしてね");
-            const res = await fetch(`/api/posts/${id}/like`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ userId: currentUser.userId }) });
-            if(res.ok) { const d = await res.json(); document.getElementById('like-'+id).innerText = d.likes; btn.classList.add('liked'); }
-        }
-        async function reportPost(id, authorId) {
-            const reason = prompt("理由を入力:");
-            if(!reason) return;
-            await fetch('/api/report', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ postId: id, userId: currentUser.userId, reason, postAuthorId: authorId }) });
-            alert("通報完了");
+
+        async function blockUser(targetId) {
+            if(!confirm("このユーザーの投稿を非表示にしますか？")) return;
+            await fetch('/api/user/block', {
+                method: 'POST', 
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ userId: currentUser.userId, targetId })
+            });
+            alert("ブロックしました（再読み込みで反映）");
+            location.reload();
         }
 
         async function postAA() {
@@ -107,29 +132,24 @@
             const title = document.getElementById('title').value;
             const content = document.getElementById('content').value;
             const tags = document.getElementById('tags').value;
-            if(!title || !content) return alert("入力してください");
-            
+            if(!title || !content) return;
             btn.disabled = true;
-            btn.innerText = "送信中...";
-
-            const res = await fetch('/api/posts', { 
+            await fetch('/api/posts', {
                 method: 'POST', 
-                headers: {'Content-Type': 'application/json'}, 
-                body: JSON.stringify({ title, content, tags, author: currentUser.displayName, userId: currentUser.userId }) 
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ title, content, tags, author: currentUser.displayName, userId: currentUser.userId })
             });
-            
-            if (res.ok) {
-                // データベースの反映を待つため少しだけ待機してからリロード
-                setTimeout(() => {
-                    location.reload();
-                }, 500);
-            } else {
-                const err = await res.json();
-                alert(err.error || "投稿に失敗しました");
-                btn.disabled = false;
-                btn.innerText = "投稿する";
-            }
+            setTimeout(() => location.reload(), 500);
         }
+
+        async function likePost(id, btn) {
+            if(!currentUser) return alert("ログインしてね");
+            const res = await fetch(`/api/posts/${id}/like`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ userId: currentUser.userId }) });
+            const d = await res.json();
+            document.getElementById('l-'+id).innerText = d.likes;
+        }
+
+        function logout() { localStorage.removeItem('aa_user'); location.reload(); }
         updateUI(); loadPosts();
     </script>
 </body>
