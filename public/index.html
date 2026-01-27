@@ -1,17 +1,23 @@
 <!DOCTYPE html>
-<html>
+<html lang="ja">
 <head>
     <meta charset="UTF-8">
     <title>AA HUB 2026</title>
     <style>
-        /* 前回のスタイルをそのまま貼り付け */
         body { font-family: sans-serif; background: #f4f4f9; padding: 20px; max-width: 900px; margin: 0 auto; }
         .card { background: white; padding: 15px; margin-bottom: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        .aa-content { font-family: "Mona", "MS PGothic", "ＭＳ Ｐゴシック", sans-serif; font-size: 16px; line-height: 1.1; white-space: pre; overflow: hidden; max-height: 300px; transition: max-height 0.3s; background: #fff; padding: 15px; border: 1px solid #ddd; overflow-x: auto;}
+        .aa-content { 
+            font-family: "Mona", "MS PGothic", "ＭＳ Ｐゴシック", sans-serif; 
+            font-size: 16px; line-height: 1.1; white-space: pre; 
+            overflow: hidden; max-height: 300px; transition: max-height 0.3s;
+            background: #fff; padding: 15px; border: 1px solid #ddd; overflow-x: auto;
+        }
         .aa-content.expanded { max-height: none; }
-        .expand-btn { width: 100%; padding: 8px; background: #eee; border: none; cursor: pointer; }
+        .expand-btn { width: 100%; padding: 8px; background: #eee; border: none; cursor: pointer; border-radius: 0 0 5px 5px; }
         #auth-header { text-align: right; margin-bottom: 20px; }
         .hidden { display: none; }
+        .like-btn { background: none; border: 1px solid #ff4757; color: #ff4757; border-radius: 20px; padding: 5px 15px; cursor: pointer; margin-top: 10px; }
+        input, textarea { width: 100%; box-sizing: border-box; margin-bottom: 10px; padding: 10px; border: 1px solid #ccc; border-radius: 4px; }
     </style>
 </head>
 <body>
@@ -25,16 +31,18 @@
     </div>
 
     <h1>AA HUB 2026</h1>
-    <!-- 投稿フォームやリスト表示のJSは前回と同じものをここに入れる -->
+
     <div id="post-form" class="card">
-        <input id="title" placeholder="タイトル" style="width:100%; margin-bottom:10px;">
-        <textarea id="content" placeholder="AAを貼り付け" style="width:100%; height:100px; margin-bottom:10px;"></textarea>
-        <button onclick="postAA()" style="width:100%; padding:10px; background:#1e90ff; color:white; border:none; border-radius:5px;">投稿する</button>
+        <input id="title" placeholder="タイトル">
+        <textarea id="content" placeholder="AAを貼り付け" rows="5"></textarea>
+        <button onclick="postAA()" style="width:100%; padding:10px; background:#1e90ff; color:white; border:none; border-radius:5px; cursor:pointer;">投稿する</button>
     </div>
+
     <div id="post-list"></div>
 
     <script>
         let currentUser = JSON.parse(localStorage.getItem('aa_user') || 'null');
+
         function updateUI() {
             if(currentUser) {
                 document.getElementById('guest-zone').classList.add('hidden');
@@ -42,28 +50,44 @@
                 document.getElementById('welcome-msg').innerText = currentUser.displayName + "さん";
             }
         }
+
         function logout() {
             localStorage.removeItem('aa_user');
             location.reload();
         }
-        // ... loadPosts や postAA の関数をここに貼り付け ...
+
         async function loadPosts() {
             const res = await fetch('/api/posts');
             const data = await res.json();
-            document.getElementById('post-list').innerHTML = data.map(p => `
+            document.getElementById('post-list').innerHTML = data.map(p => {
+                const isLong = p.content.split('\n').length > 15 || p.content.length > 500;
+                return `
                 <div class="card">
-                    <h3>${p.title}</h3>
+                    <small>${p.author} | ${new Date(p.createdAt).toLocaleString()}</small>
+                    <h3 style="margin:5px 0;">${p.title}</h3>
                     <div id="content-${p.id}" class="aa-content">${p.content}</div>
-                    <button class="expand-btn" onclick="document.getElementById('content-${p.id}').classList.toggle('expanded')">広げる/畳む</button>
+                    ${isLong ? `<button class="expand-btn" onclick="toggleAA('${p.id}', this)">広げる</button>` : ''}
+                    <button class="like-btn" onclick="likePost('${p.id}')">❤️ <span id="like-${p.id}">${p.likes || 0}</span></button>
                 </div>
-            `).join('');
+            `}).join('');
         }
-        updateUI();
-        loadPosts();
-        
+
+        function toggleAA(id, btn) {
+            const el = document.getElementById('content-' + id);
+            el.classList.toggle('expanded');
+            btn.innerText = el.classList.contains('expanded') ? '折りたたむ' : '広げる';
+        }
+
+        async function likePost(id) {
+            const res = await fetch(`/api/posts/${id}/like`, { method: 'POST' });
+            const data = await res.json();
+            if(data.success) document.getElementById('like-' + id).innerText = data.likes;
+        }
+
         async function postAA() {
             const title = document.getElementById('title').value;
             const content = document.getElementById('content').value;
+            if(!title || !content) return alert('入力してください');
             await fetch('/api/posts', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
@@ -71,6 +95,9 @@
             });
             location.reload();
         }
+
+        updateUI();
+        loadPosts();
     </script>
 </body>
 </html>
