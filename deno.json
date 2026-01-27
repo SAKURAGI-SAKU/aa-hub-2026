@@ -1,3 +1,6 @@
 {
-  "unstable": ["kv"]
+  "unstable": ["kv"],
+  "imports": {
+    "@hono/hono": "jsr:@hono/hono@4"
+  }
 }
