@@ -28,11 +28,19 @@ app.post("/api/login", async (req, res) => {
     }
 });
 
-// --- 掲示板API ---
+// --- 掲示板API (検索・タグ対応) ---
 app.get("/api/posts", async (req, res) => {
+    const { q } = req.query; // 検索ワード
     const posts = [];
     const iter = kv.list({ prefix: ["posts"] }, { reverse: true });
-    for await (const entry of iter) { posts.push(entry.value); }
+    for await (const entry of iter) {
+        const p = entry.value;
+        if (q) {
+            const searchStr = (p.title + p.content + (p.tags || []).join('')).toLowerCase();
+            if (!searchStr.includes(q.toLowerCase())) continue;
+        }
+        posts.push(p);
+    }
     res.json(posts);
 });
 
@@ -46,13 +54,15 @@ app.get("/api/users/:userId/posts", async (req, res) => {
 });
 
 app.post("/api/posts", async (req, res) => {
-    const { title, content, author, userId } = req.body;
+    const { title, content, author, userId, tags } = req.body;
     const lastPostKey = ["user_last_post", userId];
     const lastPost = await kv.get(lastPostKey);
     const now = Date.now();
     if (lastPost.value && now - lastPost.value < 10000) return res.status(429).json({ error: "10秒待ってください" });
     const id = now.toString();
-    const newPost = { id, title, content, author, userId, likes: 0, likedBy: [], createdAt: new Date() };
+    // タグを配列として保存
+    const tagList = tags ? tags.split(',').map(t => t.trim()).filter(t => t) : [];
+    const newPost = { id, title, content, author, userId, tags: tagList, likes: 0, likedBy: [], createdAt: new Date() };
     await kv.set(["posts", id], newPost);
     await kv.set(lastPostKey, now);
     res.json({ success: true });
@@ -80,7 +90,7 @@ app.post("/api/report", async (req, res) => {
     res.json({ success: true });
 });
 
-// --- 通知機能 ---
+// --- 通知・管理機能 (変更なし) ---
 app.post("/api/admin/notify", async (req, res) => {
     const { adminId, targetUserId, message } = req.body;
     const admin = await kv.get(["users", adminId]);
@@ -97,7 +107,6 @@ app.get("/api/notifications/:userId", async (req, res) => {
     res.json(notes);
 });
 
-// --- 管理者API ---
 app.get("/api/admin/reports", async (req, res) => {
     const reports = [];
     const iter = kv.list({ prefix: ["reports"] }, { reverse: true });
