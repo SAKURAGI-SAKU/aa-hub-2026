@@ -11,7 +11,6 @@ app.post("/api/register", async (req, res) => {
     if(!userId || !password) return res.status(400).json({ error: "IDとPWは必須です" });
     const existing = await kv.get(["users", userId]);
     if (existing.value) return res.status(400).json({ error: "既に存在するIDです" });
-    
     let isFirst = true;
     for await (const _ of kv.list({ prefix: ["users"] }, { limit: 1 })) { isFirst = false; }
     const user = { userId, password, displayName: displayName || userId, isAdmin: isFirst };
@@ -29,7 +28,7 @@ app.post("/api/login", async (req, res) => {
     }
 });
 
-// --- 掲示板API ---
+// --- 掲示板・通報API ---
 app.get("/api/posts", async (req, res) => {
     const posts = [];
     const iter = kv.list({ prefix: ["posts"] }, { reverse: true });
@@ -40,14 +39,10 @@ app.get("/api/posts", async (req, res) => {
 app.post("/api/posts", async (req, res) => {
     const { title, content, author, userId } = req.body;
     if (!userId) return res.status(401).json({ error: "ログインが必要です" });
-    
     const lastPostKey = ["user_last_post", userId];
     const lastPost = await kv.get(lastPostKey);
     const now = Date.now();
-    if (lastPost.value && now - lastPost.value < 10000) { 
-        return res.status(429).json({ error: "連打防止：10秒待ってください" });
-    }
-    
+    if (lastPost.value && now - lastPost.value < 10000) return res.status(429).json({ error: "10秒待ってください" });
     const id = now.toString();
     const newPost = { id, title, content, author, userId, likes: 0, likedBy: [], createdAt: new Date() };
     await kv.set(["posts", id], newPost);
@@ -55,10 +50,19 @@ app.post("/api/posts", async (req, res) => {
     res.json({ success: true });
 });
 
+// ★通報送信API
+app.post("/api/report", async (req, res) => {
+    const { postId, userId, reason } = req.body;
+    if (!userId) return res.status(401).json({ error: "ログインが必要です" });
+    const id = Date.now().toString();
+    const report = { id, postId, reporterId: userId, reason, createdAt: new Date() };
+    await kv.set(["reports", id], report);
+    res.json({ success: true });
+});
+
 app.post("/api/posts/:id/like", async (req, res) => {
     const { id } = req.params;
     const { userId } = req.body;
-    if (!userId) return res.status(401).json({ error: "ログインしてください" });
     const postKey = ["posts", id];
     const post = await kv.get(postKey);
     if (post.value) {
@@ -71,12 +75,18 @@ app.post("/api/posts/:id/like", async (req, res) => {
     } else { res.status(404).send(); }
 });
 
-// ★管理者用：削除API
+// --- 管理者用API ---
+app.get("/api/admin/reports", async (req, res) => {
+    const reports = [];
+    const iter = kv.list({ prefix: ["reports"] }, { reverse: true });
+    for await (const entry of iter) { reports.push(entry.value); }
+    res.json(reports);
+});
+
 app.post("/api/admin/delete", async (req, res) => {
     const { postId, adminId } = req.body;
     const user = await kv.get(["users", adminId]);
     if (!user.value || !user.value.isAdmin) return res.status(403).json({ error: "権限なし" });
-    
     await kv.delete(["posts", postId]);
     res.json({ success: true });
 });
