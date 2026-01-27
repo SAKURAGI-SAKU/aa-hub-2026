@@ -5,16 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AA HUB 2026</title>
     <style>
-        :root {
-            --bg: #f4f7f6; --card-bg: #ffffff; --text: #2d3436; --border: #dfe6e9;
-            --accent: #0984e3; --secondary: #636e72; --aa-bg: #ffffff;
-            --liked-color: #ff4757; --report-color: #e17055;
-        }
-        body.dark {
-            --bg: #1e272e; --card-bg: #2f3542; --text: #f1f2f6; --border: #57606f;
-            --accent: #70a1ff; --secondary: #a4b0be; --aa-bg: #1e272e;
-            --liked-color: #ff6b81; --report-color: #fab1a0;
-        }
+        :root { --bg: #f4f7f6; --card-bg: #ffffff; --text: #2d3436; --border: #dfe6e9; --accent: #0984e3; --secondary: #636e72; --aa-bg: #ffffff; --liked-color: #ff4757; --report-color: #e17055; --emergency-bg: #ff7675; }
+        body.dark { --bg: #1e272e; --card-bg: #2f3542; --text: #f1f2f6; --border: #57606f; --accent: #70a1ff; --secondary: #a4b0be; --aa-bg: #1e272e; --liked-color: #ff6b81; --report-color: #fab1a0; }
         body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', sans-serif; transition: 0.3s; margin: 0; padding: 20px; }
         .container { max-width: 800px; margin: 0 auto; }
         .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
@@ -26,39 +18,55 @@
         .btn-primary { background: var(--accent); color: white; }
         .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--secondary); font-size: 12px; }
         .tag { color: var(--accent); font-size: 13px; margin-right: 8px; cursor: pointer; }
-        .badge { background: #ff4757; color: white; padding: 2px 7px; border-radius: 10px; font-size: 11px; margin-left: -5px; }
+        .badge { background: #ff4757; color: white; padding: 2px 7px; border-radius: 10px; font-size: 10px; position: relative; top: -10px; left: -5px; }
         .hidden { display: none; }
-
-        /* 新しいプロファイルポップアップ用スタイル */
         #profile-popup { position: fixed; right: 20px; top: 70px; background: var(--card-bg); border: 1px solid var(--border); padding: 15px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); z-index: 100; }
+        .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); display: flex; justify-content: center; align-items: center; z-index: 1000; }
+        .modal-content { background: var(--card-bg); padding: 30px; border-radius: 15px; max-width: 500px; width: 90%; text-align: center; }
+        .emergency-banner { background: var(--emergency-bg); color: white; padding: 15px; border-radius: 8px; margin-bottom: 20px; font-weight: bold; animation: shake 0.5s infinite; }
+        @keyframes shake { 0% { transform: translateX(0); } 25% { transform: translateX(-2px); } 50% { transform: translateX(2px); } 75% { transform: translateX(-2px); } 100% { transform: translateX(0); } }
     </style>
 </head>
 <body class="light">
+    <div id="emergency-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="emergency-banner">🚨 緊急告知 🚨</div>
+            <p id="emergency-text"></p>
+            <button class="btn btn-primary" onclick="closeEmergency()">確認しました</button>
+        </div>
+    </div>
+
+    <div id="note-modal" class="modal hidden">
+        <div class="modal-content">
+            <h3>✉️ 通知メッセージ</h3>
+            <div id="note-list" style="max-height: 300px; overflow-y: auto; text-align: left; margin: 20px 0;"></div>
+            <button class="btn btn-primary" onclick="closeNotes()">閉じて既読にする</button>
+        </div>
+    </div>
+
     <div class="container">
         <div class="header">
             <h1>AA HUB 2026</h1>
             <div>
                 <button class="btn btn-outline" onclick="toggleTheme()">🌓 モード切替</button>
                 <span id="user-zone" class="hidden">
-                    <span id="note-icon" onclick="showNotes()" style="cursor:pointer; margin-left: 10px;">✉️<span id="note-badge" class="badge hidden">0</span></span>
-                    <!-- ここをクリックでポップアップ表示 -->
-                    <span id="display-name-header" style="margin-left: 10px; cursor:pointer;" onclick="toggleProfilePopup()"></span>
+                    <span onclick="showNotes()" style="cursor:pointer; margin-left: 10px;">✉️<span id="note-badge" class="badge hidden">0</span></span>
+                    <span id="display-name-header" style="margin-left: 10px; cursor:pointer; font-weight: bold;" onclick="toggleProfilePopup()"></span>
                 </span>
                 <span id="guest-zone"><a href="/login.html" class="btn btn-primary" style="text-decoration:none">ログイン</a></span>
             </div>
         </div>
 
-        <!-- プロフィールポップアップ -->
-        <div id="profile-popup" class="hidden">
-            <p>ようこそ、<strong id="popup-display-name"></strong>さん</p>
-            <p><small>アカウントID: <span id="popup-user-id"></span></small></p>
-            <button class="btn btn-primary" style="width:100%; margin-left: 0;" onclick="location.href='/profile.html?uid=' + currentUser.userId">マイページ</button>
-            <button class="btn btn-outline" style="width:100%; margin-left: 0; margin-top: 5px;" onclick="logout()">ログアウト</button>
-            <div id="admin-link-popup" class="hidden" style="margin-top: 10px;"><a href="/admin.html" style="color:red; text-decoration: none; font-weight: bold;">[管理パネルへ]</a></div>
+        <div id="profile-popup" class="card hidden">
+            <p><strong><span id="popup-display-name"></span></strong> さん</p>
+            <p><small id="popup-user-id"></small></p>
+            <button class="btn btn-primary" style="width:100%; margin:0;" onclick="location.href='/profile.html?uid='+currentUser.userId">マイページ</button>
+            <button class="btn btn-outline" style="width:100%; margin:5px 0 0 0;" onclick="logout()">ログアウト</button>
+            <div id="admin-link-popup" class="hidden" style="margin-top:10px;"><a href="/admin.html" style="color:red; font-weight:bold;">[管理パネル]</a></div>
         </div>
 
         <div class="search-bar" style="display:flex; gap:10px; margin-bottom:20px;">
-            <input id="search-input" placeholder="AAを探す..." style="margin:0">
+            <input id="search-input" placeholder="キーワード検索...">
             <button onclick="loadPosts(document.getElementById('search-input').value)" class="btn btn-primary">検索</button>
         </div>
 
@@ -69,37 +77,40 @@
             <button onclick="postAA()" id="submit-btn" class="btn btn-primary" style="width:100%">投稿する</button>
         </div>
 
-        <div id="post-list">読み込み中...</div>
+        <div id="post-list"></div>
     </div>
 
     <script>
         let currentUser = JSON.parse(localStorage.getItem('aa_user') || 'null');
-        
-        function toggleTheme() {
-            document.body.classList.toggle('dark');
-            localStorage.setItem('theme', document.body.classList.contains('dark') ? 'dark' : 'light');
-        }
+
+        function toggleTheme() { document.body.classList.toggle('dark'); localStorage.setItem('theme', document.body.classList.contains('dark')?'dark':'light'); }
         if(localStorage.getItem('theme') === 'dark') document.body.classList.add('dark');
+        function toggleProfilePopup() { document.getElementById('profile-popup').classList.toggle('hidden'); }
 
-        function toggleProfilePopup() {
-            document.getElementById('profile-popup').classList.toggle('hidden');
-        }
-
-        function updateUI() {
+        async function updateUI() {
             if(currentUser) {
                 document.getElementById('guest-zone').classList.add('hidden');
                 document.getElementById('user-zone').classList.remove('hidden');
                 document.getElementById('post-form').classList.remove('hidden');
-                
-                // ヘッダーとポップアップに表示名とIDを設定
                 document.getElementById('display-name-header').innerText = currentUser.displayName;
                 document.getElementById('popup-display-name').innerText = currentUser.displayName;
                 document.getElementById('popup-user-id').innerText = `@${currentUser.userId}`;
-
                 if(currentUser.isAdmin) document.getElementById('admin-link-popup').classList.remove('hidden');
                 checkNotes();
+                checkEmergency();
             }
         }
+
+        async function checkEmergency() {
+            const res = await fetch('/api/emergency');
+            const data = await res.json();
+            if (data && localStorage.getItem('last_emergency') !== data.createdAt) {
+                document.getElementById('emergency-text').innerText = data.message;
+                document.getElementById('emergency-modal').classList.remove('hidden');
+                localStorage.setItem('temp_emergency_id', data.createdAt);
+            }
+        }
+        function closeEmergency() { localStorage.setItem('last_emergency', localStorage.getItem('temp_emergency_id')); document.getElementById('emergency-modal').classList.add('hidden'); }
 
         async function checkNotes() {
             const res = await fetch('/api/notifications/' + currentUser.userId);
@@ -109,27 +120,28 @@
                 b.innerText = notes.length; b.classList.remove('hidden');
             }
         }
-        function showNotes() {
-            fetch('/api/notifications/' + currentUser.userId).then(r => r.json()).then(notes => {
-                alert(notes.length ? "【通知】\n" + notes.map(n => `・${n.message}`).join('\n') : "通知はありません");
-            });
+        async function showNotes() {
+            const res = await fetch('/api/notifications/' + currentUser.userId);
+            const notes = await res.json();
+            document.getElementById('note-list').innerHTML = notes.map(n => `<div style="padding:10px; border-bottom:1px solid var(--border);">${n.message} <br><small>${new Date(n.createdAt).toLocaleString()}</small></div>`).join('') || "通知はありません";
+            document.getElementById('note-modal').classList.remove('hidden');
         }
-        function logout() { localStorage.removeItem('aa_user'); location.reload(); }
+        async function closeNotes() {
+            await fetch('/api/notifications/read', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ userId: currentUser.userId }) });
+            document.getElementById('note-modal').classList.add('hidden');
+            document.getElementById('note-badge').classList.add('hidden');
+        }
 
         async function loadPosts(query = '') {
             const url = `/api/posts?q=${encodeURIComponent(query)}&viewerId=${currentUser?.userId || ''}`;
             const res = await fetch(url);
             const data = await res.json();
-            document.getElementById('post-list').innerHTML = data.map(p => {
-                const likedClass = (currentUser && p.likedBy?.includes(currentUser.userId)) ? 'liked' : '';
-                return `
+            document.getElementById('post-list').innerHTML = data.map(p => `
                 <div class="card">
                     <div style="display:flex; justify-content:space-between; align-items:center;">
-                        <small class="user-link" onclick="location.href='/profile.html?uid=${p.userId}'">
-                            <strong>${p.author}</strong> <span style="color:var(--secondary);">@${p.userId}</span>
-                        </small>
+                        <small class="user-link" onclick="location.href='/profile.html?uid=${p.userId}'"><strong>${p.author}</strong> @${p.userId}</small>
                         <div>
-                            ${(currentUser && currentUser.isAdmin) ? `<button class="btn btn-outline" style="color:var(--report-color);" onclick="deletePost('${p.id}')">削除</button>` : ''}
+                            ${(currentUser && currentUser.isAdmin) ? `<button class="btn btn-outline" style="color:red" onclick="deletePost('${p.id}')">削除</button>` : ''}
                             ${(currentUser && currentUser.userId !== p.userId) ? `<button class="btn btn-outline" onclick="blockUser('${p.userId}')">ブロック</button>` : ''}
                         </div>
                     </div>
@@ -137,60 +149,32 @@
                     <div>${(p.tags || []).map(t => `<span class="tag" onclick="loadPosts('${t}')">#${t}</span>`).join('')}</div>
                     <div id="c-${p.id}" class="aa-content" style="margin-top:15px">${p.content}</div>
                     <div style="margin-top:15px; display:flex; gap:10px">
-                        <!-- いいねボタンのUI改善: 色と数を分かりやすく -->
-                        <button class="btn btn-outline ${likedClass}" onclick="likePost('${p.id}', this)" style="color:var(--liked-color); border-color:var(--liked-color);">
-                            ❤️ <span id="l-${p.id}">${p.likes || 0}</span>
-                        </button>
-                        <!-- 通報ボタンのUI改善: アイコンとテキストを追加 -->
-                        <button class="btn btn-outline" onclick="reportPost('${p.id}', '${p.userId}')" style="color:var(--report-color); border-color:var(--report-color);">
-                            🚩 通報
-                        </button>
+                        <button class="btn btn-outline ${(currentUser && p.likedBy?.includes(currentUser.userId)) ? 'liked' : ''}" onclick="likePost('${p.id}', this)" style="color:var(--liked-color); border-color:var(--liked-color);">❤️ <span id="l-${p.id}">${p.likes || 0}</span></button>
+                        <button class="btn btn-outline" onclick="reportPost('${p.id}', '${p.userId}')" style="color:var(--report-color); border-color:var(--report-color);">🚩 通報</button>
                         <button class="btn btn-outline" onclick="document.getElementById('c-${p.id}').classList.toggle('expanded')">展開/縮小</button>
                     </div>
-                </div>`
-            }).join('');
+                </div>`).join('');
         }
 
-        async function blockUser(targetId) {
-            if(!confirm("このユーザーを非表示にしますか？")) return;
-            await fetch('/api/user/block', {
-                method: 'POST', headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ userId: currentUser.userId, targetId })
-            });
-            alert("ブロックしました（再読み込みで反映）"); location.reload();
-        }
-        async function deletePost(id) { /* ... 削除機能JSは省略 ... */ }
-        async function likePost(id, btn) { /* ... いいね機能JSは省略 ... */ }
-        async function reportPost(id, authorId) { /* ... 通報機能JSは省略 ... */ }
-        async function postAA() { /* ... 投稿機能JSは省略 ... */ }
-        
-        // 既存の機能関数をここにペーストして統合する
-        function deletePost(id) {
-            if(!confirm("削除しますか？")) return;
-            fetch('/api/admin/delete', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ postId: id, adminId: currentUser.userId }) });
-            loadPosts();
-        }
         async function likePost(id, btn) {
             if(!currentUser) return alert("ログインしてね");
             const res = await fetch(`/api/posts/${id}/like`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ userId: currentUser.userId }) });
-            if(res.ok) { const d = await res.json(); document.getElementById('l-'+id).innerText = d.likes; btn.classList.add('liked'); }
-        }
-        async function reportPost(id, authorId) {
-            const reason = prompt("通報理由:");
-            if(!reason) return;
-            await fetch('/api/report', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ postId: id, userId: currentUser.userId, reason, postAuthorId: authorId }) });
-            alert("通報完了");
+            if(res.ok) { const d = await res.json(); document.getElementById('l-'+id).innerText = d.likes; btn.style.background = "var(--liked-color)"; btn.style.color = "white"; }
         }
         async function postAA() {
             const btn = document.getElementById('submit-btn');
             const title = document.getElementById('title').value;
             const content = document.getElementById('content').value;
             const tags = document.getElementById('tags').value;
+            if(!title || !content) return;
             btn.disabled = true;
-            const res = await fetch('/api/posts', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ title, content, tags, author: currentUser.displayName, userId: currentUser.userId }) });
-            if (res.ok) { setTimeout(() => location.reload(), 500); } else { alert("エラー"); btn.disabled = false; }
+            await fetch('/api/posts', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ title, content, tags, author: currentUser.displayName, userId: currentUser.userId }) });
+            setTimeout(() => location.reload(), 500);
         }
-
+        function reportPost(id, authorId) { const r = prompt("通報理由:"); if(r) fetch('/api/report', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ postId: id, userId: currentUser.userId, reason: r, postAuthorId: authorId }) }).then(() => alert("通報しました")); }
+        function blockUser(tid) { if(confirm("非表示にしますか？")) fetch('/api/user/block', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({userId:currentUser.userId, targetId:tid}) }).then(() => location.reload()); }
+        function deletePost(id) { if(confirm("削除しますか？")) fetch('/api/admin/delete', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({postId:id, adminId:currentUser.userId}) }).then(() => loadPosts()); }
+        function logout() { localStorage.removeItem('aa_user'); location.reload(); }
         updateUI(); loadPosts();
     </script>
 </body>
