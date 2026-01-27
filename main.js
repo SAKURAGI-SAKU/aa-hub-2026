@@ -15,7 +15,9 @@ app.post("/api/register", async (c) => {
     if (existing.value) return c.json({ error: "ID重複" }, 400);
     
     let isFirst = true;
-    for await (const _ of kv.list({ prefix: ["users"] }, { limit: 1 })) { isFirst = false; }
+    const iter = kv.list({ prefix: ["users"] }, { limit: 1 });
+    for await (const _ of iter) { isFirst = false; }
+    
     const user = { userId, password, displayName: displayName || userId, isAdmin: isFirst, blockList: [] };
     await kv.set(["users", userId], user);
     return c.json({ success: true, user });
