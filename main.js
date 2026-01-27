@@ -5,7 +5,7 @@ const kv = await Deno.openKv();
 app.use(Express.json());
 app.use(Express.static("public"));
 
-// --- ユーザー認証API ---
+// --- ユーザー認証 ---
 app.post("/api/register", async (req, res) => {
     const { userId, password, displayName } = req.body;
     if(!userId || !password) return res.status(400).json({ error: "IDとPWは必須です" });
@@ -28,7 +28,7 @@ app.post("/api/login", async (req, res) => {
     }
 });
 
-// --- 掲示板・通報API ---
+// --- 掲示板API ---
 app.get("/api/posts", async (req, res) => {
     const posts = [];
     const iter = kv.list({ prefix: ["posts"] }, { reverse: true });
@@ -36,9 +36,17 @@ app.get("/api/posts", async (req, res) => {
     res.json(posts);
 });
 
+app.get("/api/users/:userId/posts", async (req, res) => {
+    const posts = [];
+    const iter = kv.list({ prefix: ["posts"] }, { reverse: true });
+    for await (const entry of iter) {
+        if (entry.value.userId === req.params.userId) posts.push(entry.value);
+    }
+    res.json(posts);
+});
+
 app.post("/api/posts", async (req, res) => {
     const { title, content, author, userId } = req.body;
-    if (!userId) return res.status(401).json({ error: "ログインが必要です" });
     const lastPostKey = ["user_last_post", userId];
     const lastPost = await kv.get(lastPostKey);
     const now = Date.now();
@@ -50,16 +58,6 @@ app.post("/api/posts", async (req, res) => {
     res.json({ success: true });
 });
 
-// ★通報送信API
-app.post("/api/report", async (req, res) => {
-    const { postId, userId, reason } = req.body;
-    if (!userId) return res.status(401).json({ error: "ログインが必要です" });
-    const id = Date.now().toString();
-    const report = { id, postId, reporterId: userId, reason, createdAt: new Date() };
-    await kv.set(["reports", id], report);
-    res.json({ success: true });
-});
-
 app.post("/api/posts/:id/like", async (req, res) => {
     const { id } = req.params;
     const { userId } = req.body;
@@ -67,7 +65,7 @@ app.post("/api/posts/:id/like", async (req, res) => {
     const post = await kv.get(postKey);
     if (post.value) {
         const updated = post.value;
-        if (updated.likedBy.includes(userId)) return res.status(400).json({ error: "済み" });
+        if (updated.likedBy.includes(userId)) return res.status(400).send();
         updated.likes = (updated.likes || 0) + 1;
         updated.likedBy.push(userId);
         await kv.set(postKey, updated);
@@ -75,7 +73,31 @@ app.post("/api/posts/:id/like", async (req, res) => {
     } else { res.status(404).send(); }
 });
 
-// --- 管理者用API ---
+app.post("/api/report", async (req, res) => {
+    const { postId, userId, reason, postAuthorId } = req.body;
+    const id = Date.now().toString();
+    await kv.set(["reports", id], { id, postId, reporterId: userId, targetUserId: postAuthorId, reason, createdAt: new Date() });
+    res.json({ success: true });
+});
+
+// --- 通知機能 ---
+app.post("/api/admin/notify", async (req, res) => {
+    const { adminId, targetUserId, message } = req.body;
+    const admin = await kv.get(["users", adminId]);
+    if (!admin.value || !admin.value.isAdmin) return res.status(403).send();
+    const id = Date.now().toString();
+    await kv.set(["notifications", targetUserId, id], { id, message, createdAt: new Date() });
+    res.json({ success: true });
+});
+
+app.get("/api/notifications/:userId", async (req, res) => {
+    const notes = [];
+    const iter = kv.list({ prefix: ["notifications", req.params.userId] }, { reverse: true });
+    for await (const entry of iter) { notes.push(entry.value); }
+    res.json(notes);
+});
+
+// --- 管理者API ---
 app.get("/api/admin/reports", async (req, res) => {
     const reports = [];
     const iter = kv.list({ prefix: ["reports"] }, { reverse: true });
@@ -86,7 +108,7 @@ app.get("/api/admin/reports", async (req, res) => {
 app.post("/api/admin/delete", async (req, res) => {
     const { postId, adminId } = req.body;
     const user = await kv.get(["users", adminId]);
-    if (!user.value || !user.value.isAdmin) return res.status(403).json({ error: "権限なし" });
+    if (!user.value || !user.value.isAdmin) return res.status(403).send();
     await kv.delete(["posts", postId]);
     res.json({ success: true });
 });
