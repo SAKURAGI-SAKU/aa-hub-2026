@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AA HUB 2026</title>
     <style>
-        /* (既存のスタイル) */
         :root { --bg: #f4f7f6; --card-bg: #ffffff; --text: #2d3436; --border: #dfe6e9; --accent: #0984e3; --secondary: #636e72; --aa-bg: #ffffff; --liked-color: #ff4757; --report-color: #e17055; --emergency-bg: #ff7675; }
         body.dark { --bg: #1e272e; --card-bg: #2f3542; --text: #f1f2f6; --border: #57606f; --accent: #70a1ff; --secondary: #a4b0be; --aa-bg: #1e272e; --liked-color: #ff6b81; --report-color: #fab1a0; }
         body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', sans-serif; transition: 0.3s; margin: 0; padding: 20px; }
@@ -14,26 +13,22 @@
         .card { background: var(--card-bg); padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 20px; border: 1px solid var(--border); }
         .aa-content { font-family: "Mona", "MS PGothic", "ＭＳ Ｐゴシック", sans-serif; font-size: 16px; line-height: 1.1; white-space: pre; overflow-x: auto; background: var(--aa-bg); padding: 15px; border-radius: 8px; border: 1px solid var(--border); max-height: 300px; transition: 0.3s; }
         .aa-content.expanded { max-height: none; }
-        input, textarea { width: 100%; box-sizing: border-box; background: var(--aa-bg); color: var(--text); border: 1px solid var(--border); padding: 12px; border-radius: 8px; margin-bottom: 10px; }
         .btn { border: none; padding: 10px 15px; border-radius: 8px; cursor: pointer; font-weight: bold; transition: 0.2s; margin-left: 5px; }
         .btn-primary { background: var(--accent); color: white; }
         .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--secondary); font-size: 12px; }
-        .tag { color: var(--accent); font-size: 13px; margin-right: 8px; cursor: pointer; }
+        .like-active { background: var(--liked-color) !important; color: white !important; border-color: var(--liked-color) !important; }
         .badge { background: #ff4757; color: white; padding: 2px 7px; border-radius: 10px; font-size: 10px; position: relative; top: -10px; left: -5px; }
         .hidden { display: none !important; }
-        #notification-box { background: #fff9db; border: 1px solid #fab005; border-radius: 12px; padding: 20px; margin-bottom: 20px; color: #333; }
-        body.dark #notification-box { background: #3e3b2e; border-color: #fab005; color: #eee; }
-        .note-item { padding: 10px 0; border-bottom: 1px solid rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center; }
-        #profile-popup { position: fixed; right: 20px; top: 70px; background: var(--card-bg); border: 1px solid var(--border); padding: 15px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); z-index: 100; }
         .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); display: flex; justify-content: center; align-items: center; z-index: 1000; }
         .modal-content { background: var(--card-bg); padding: 30px; border-radius: 15px; max-width: 500px; width: 90%; text-align: center; color: var(--text); }
+        #notification-box { background: #fff9db; border: 1px solid #fab005; border-radius: 12px; padding: 20px; margin-bottom: 20px; color: #333; }
+        body.dark #notification-box { background: #3e3b2e; border-color: #fab005; color: #eee; }
     </style>
 </head>
-<body class="light">
-    <!-- 緊急告知モーダル -->
+<body>
     <div id="emergency-modal" class="modal hidden">
         <div class="modal-content">
-            <div style="background:var(--emergency-bg);color:white;padding:15px;border-radius:8px;margin-bottom:20px;font-weight:bold;">🚨 重要なお知らせ</div>
+            <div id="em-title" style="background:var(--emergency-bg);color:white;padding:15px;border-radius:8px;margin-bottom:20px;font-weight:bold;">🚨 お知らせ</div>
             <p id="emergency-text" style="font-size:1.1em; line-height:1.6;"></p>
             <button class="btn btn-primary" style="width:100%" onclick="closeEmergency()">確認して閉じる</button>
         </div>
@@ -41,74 +36,43 @@
 
     <div class="container">
         <div class="header">
-            <h1>AA HUB 2026</h1>
+            <h1 style="cursor:pointer" onclick="location.href='/'">AA HUB 2026</h1>
             <div>
-                <button class="btn btn-outline" onclick="toggleTheme()">🌓 モード切替</button>
+                <button class="btn btn-outline" onclick="toggleTheme()">🌓</button>
                 <span id="user-zone" class="hidden">
-                    <span onclick="toggleNotifications()" style="cursor:pointer; margin-left: 10px;">✉️<span id="note-badge" class="badge hidden">0</span></span>
-                    <span id="display-name-header" style="margin-left: 10px; cursor:pointer; font-weight: bold;" onclick="toggleProfilePopup()"></span>
+                    <span onclick="toggleNotifications()" style="cursor:pointer; margin-left:10px;">✉️<span id="note-badge" class="badge hidden">0</span></span>
+                    <span id="display-name-header" style="margin-left:10px; cursor:pointer; font-weight:bold;" onclick="document.getElementById('profile-popup').classList.toggle('hidden')"></span>
                 </span>
                 <span id="guest-zone"><a href="/login.html" class="btn btn-primary" style="text-decoration:none">ログイン</a></span>
             </div>
         </div>
 
         <div id="profile-popup" class="card hidden">
-            <p><strong><span id="popup-display-name"></span></strong> さん</p>
-            <p><small id="popup-user-id"></small></p>
-            <button class="btn btn-primary" style="width:100%; margin:0;" onclick="location.href='/profile.html?uid='+currentUser.userId">マイページ</button>
-            <button class="btn btn-outline" style="width:100%; margin:5px 0 0 0;" onclick="logout()">ログアウト</button>
+            <p><strong id="popup-display-name"></strong> さん <small id="popup-user-id"></small></p>
+            <button class="btn btn-primary" style="width:100%" onclick="location.href='/profile.html?uid='+currentUser.userId">マイページ</button>
+            <button class="btn btn-outline" style="width:100%; margin-top:5px" onclick="localStorage.removeItem('aa_user');location.reload()">ログアウト</button>
             <div id="admin-link-popup" class="hidden" style="margin-top:10px;"><a href="/admin.html" style="color:red; font-weight:bold;">[管理パネル]</a></div>
         </div>
 
         <div id="notification-box" class="hidden">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-                <h3 style="margin:0">✉️ あなたへのメッセージ</h3>
-                <button class="btn btn-outline" onclick="closeNotes()">すべて既読にして閉じる</button>
+                <h3 style="margin:0">✉️ メッセージ</h3>
+                <button class="btn btn-outline" onclick="closeNotes()">すべて既読にする</button>
             </div>
             <div id="note-list"></div>
         </div>
 
-        <div class="search-bar" style="display:flex; gap:10px; margin-bottom:20px;">
-            <input id="search-input" placeholder="キーワード検索...">
-            <button onclick="loadPosts(document.getElementById('search-input').value)" class="btn btn-primary">検索</button>
-        </div>
-
         <div id="post-form" class="card hidden">
-            <input id="title" placeholder="タイトル">
-            <textarea id="content" placeholder="AAを貼り付け" rows="6"></textarea>
-            <input id="tags" placeholder="タグ（カンマ区切り）">
-            <button onclick="postAA()" id="submit-btn" class="btn btn-primary" style="width:100%">投稿する</button>
+            <input id="title" placeholder="タイトル"><textarea id="content" placeholder="AA内容" rows="5"></textarea>
+            <input id="tags" placeholder="タグ（カンマ区切り）"><button onclick="postAA()" id="submit-btn" class="btn btn-primary" style="width:100%">投稿する</button>
         </div>
-
         <div id="post-list">読み込み中...</div>
     </div>
 
     <script>
         let currentUser = JSON.parse(localStorage.getItem('aa_user') || 'null');
-
         function toggleTheme() { document.body.classList.toggle('dark'); localStorage.setItem('theme', document.body.classList.contains('dark')?'dark':'light'); }
         if(localStorage.getItem('theme') === 'dark') document.body.classList.add('dark');
-        function toggleProfilePopup() { document.getElementById('profile-popup').classList.toggle('hidden'); }
-
-        async function toggleNotifications() {
-            const box = document.getElementById('notification-box');
-            if (box.classList.contains('hidden')) {
-                const res = await fetch('/api/notifications/' + currentUser.userId);
-                const notes = await res.json();
-                document.getElementById('note-list').innerHTML = notes.map(n => `
-                    <div class="note-item">
-                        <span>${n.message}</span>
-                        <small style="color:var(--secondary)">${new Date(n.createdAt).toLocaleDateString()}</small>
-                    </div>`).join('') || "新しい通知はありません";
-                box.classList.remove('hidden');
-            } else { box.classList.add('hidden'); }
-        }
-
-        async function closeNotes() {
-            await fetch('/api/notifications/read', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ userId: currentUser.userId }) });
-            document.getElementById('notification-box').classList.add('hidden');
-            document.getElementById('note-badge').classList.add('hidden');
-        }
 
         async function updateUI() {
             if(currentUser) {
@@ -120,83 +84,99 @@
                 document.getElementById('popup-user-id').innerText = `@${currentUser.userId}`;
                 if(currentUser.isAdmin) document.getElementById('admin-link-popup').classList.remove('hidden');
                 
-                checkNotes();
+                // 全体告知と個人向け緊急通知をチェック
                 checkEmergency();
             }
         }
 
         async function checkEmergency() {
-            const res = await fetch('/api/emergency');
-            const data = await res.json();
-            // データが存在し、かつメッセージが空でなく、かつまだこのIDを「確認済み」にしていない場合のみ表示
-            if (data && data.message && localStorage.getItem('last_emergency_id') !== data.createdAt) {
-                document.getElementById('emergency-text').innerText = data.message;
-                document.getElementById('emergency-modal').classList.remove('hidden');
-                // 一時的にこのIDを保持
-                window.currentEmergencyId = data.createdAt;
+            // 1. 全体告知
+            const resE = await fetch('/api/emergency');
+            const dataE = await resE.json();
+            if (dataE && dataE.message && localStorage.getItem('last_emergency_id') !== dataE.createdAt) {
+                showModal("🚨 重要なお知らせ", dataE.message, dataE.createdAt, true);
+                return; // 全体告知を優先
+            }
+            // 2. 個人向け緊急通知
+            const resN = await fetch('/api/notifications/' + currentUser.userId);
+            const notes = await resN.json();
+            const emergencyNote = notes.find(n => n.isEmergency && localStorage.getItem('read_note_'+n.id) !== 'true');
+            if (emergencyNote) {
+                showModal("✉️ 個別メッセージ", emergencyNote.message, emergencyNote.id, false);
+            }
+            // 通知バッジ更新
+            if(notes.length > 0) {
+                document.getElementById('note-badge').innerText = notes.length;
+                document.getElementById('note-badge').classList.remove('hidden');
             }
         }
+
+        function showModal(title, text, id, isGlobal) {
+            document.getElementById('em-title').innerText = title;
+            document.getElementById('emergency-text').innerText = text;
+            document.getElementById('emergency-modal').classList.remove('hidden');
+            window.currentModalData = { id, isGlobal };
+        }
+
         function closeEmergency() {
-            if (window.currentEmergencyId) {
-                localStorage.setItem('last_emergency_id', window.currentEmergencyId);
+            if (window.currentModalData) {
+                if(window.currentModalData.isGlobal) localStorage.setItem('last_emergency_id', window.currentModalData.id);
+                else localStorage.setItem('read_note_' + window.currentModalData.id, 'true');
             }
             document.getElementById('emergency-modal').classList.add('hidden');
+            location.reload(); // 既読反映のため
         }
 
-        async function checkNotes() {
-            if(!currentUser) return;
-            const res = await fetch('/api/notifications/' + currentUser.userId);
-            const notes = await res.json();
-            if(notes.length > 0) {
-                const b = document.getElementById('note-badge');
-                b.innerText = notes.length; b.classList.remove('hidden');
-            }
+        async function toggleNotifications() {
+            const box = document.getElementById('notification-box');
+            if (box.classList.contains('hidden')) {
+                const res = await fetch('/api/notifications/' + currentUser.userId);
+                const notes = await res.json();
+                document.getElementById('note-list').innerHTML = notes.map(n => `<div style="padding:10px; border-bottom:1px solid var(--border)">${n.message}</div>`).join('') || "通知なし";
+                box.classList.remove('hidden');
+            } else box.classList.add('hidden');
         }
 
-        async function loadPosts(query = '') {
-            const url = `/api/posts?q=${encodeURIComponent(query)}&viewerId=${currentUser?.userId || ''}`;
-            const res = await fetch(url);
+        async function closeNotes() {
+            await fetch('/api/notifications/read', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ userId: currentUser.userId }) });
+            location.reload();
+        }
+
+        async function loadPosts() {
+            const res = await fetch(`/api/posts?viewerId=${currentUser?.userId || ''}`);
             const data = await res.json();
-            document.getElementById('post-list').innerHTML = data.map(p => `
+            document.getElementById('post-list').innerHTML = data.map(p => {
+                const isLiked = currentUser && p.likedBy?.includes(currentUser.userId);
+                return `
                 <div class="card">
-                    <div style="display:flex; justify-content:space-between; align-items:center;">
-                        <small class="user-link" style="color:var(--accent); font-weight:bold; cursor:pointer;" onclick="location.href='/profile.html?uid=${p.userId}'">${p.author} @${p.userId}</small>
-                        <div>
-                            ${(currentUser && currentUser.isAdmin) ? `<button class="btn btn-outline" style="color:red" onclick="deletePost('${p.id}')">削除</button>` : ''}
-                            ${(currentUser && currentUser.userId !== p.userId) ? `<button class="btn btn-outline" onclick="blockUser('${p.userId}')">非表示</button>` : ''}
-                        </div>
+                    <small onclick="location.href='/profile.html?uid=${p.userId}'" style="cursor:pointer; color:var(--accent)">${p.author} @${p.userId}</small>
+                    <h3 style="margin:5px 0">${p.title}</h3>
+                    <div class="aa-content" id="c-${p.id}">${p.content}</div>
+                    <div style="margin-top:10px">
+                        <button class="btn btn-outline ${isLiked ? 'like-active' : ''}" onclick="likePost('${p.id}', this)">❤️ ${p.likes || 0}</button>
+                        <button class="btn btn-outline" onclick="reportPost('${p.id}', '${p.userId}')">🚩</button>
+                        <button class="btn btn-outline" onclick="document.getElementById('c-${p.id}').classList.toggle('expanded')">展開</button>
                     </div>
-                    <h3 style="margin:10px 0">${p.title}</h3>
-                    <div>${(p.tags || []).map(t => `<span class="tag" onclick="loadPosts('${t}')">#${t}</span>`).join('')}</div>
-                    <div id="c-${p.id}" class="aa-content" style="margin-top:15px">${p.content}</div>
-                    <div style="margin-top:15px; display:flex; gap:10px">
-                        <button class="btn btn-outline" onclick="likePost('${p.id}', this)" style="color:var(--liked-color); border-color:var(--liked-color);">❤️ <span id="l-${p.id}">${p.likes || 0}</span></button>
-                        <button class="btn btn-outline" onclick="reportPost('${p.id}', '${p.userId}')" style="color:var(--report-color); border-color:var(--report-color);">🚩 通報</button>
-                        <button class="btn btn-outline" onclick="document.getElementById('c-${p.id}').classList.toggle('expanded')">展開/縮小</button>
-                    </div>
-                </div>`).join('');
+                </div>`
+            }).join('');
         }
 
         async function likePost(id, btn) {
             if(!currentUser) return alert("ログインしてね");
-            const res = await fetch(`/api/posts/${id}/like`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ userId: currentUser.userId }) });
-            if(res.ok) { const d = await res.json(); document.getElementById('l-'+id).innerText = d.likes; btn.style.background = "var(--liked-color)"; btn.style.color = "white"; }
+            await fetch(`/api/posts/${id}/like`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ userId: currentUser.userId }) });
+            btn.classList.add('like-active');
+            loadPosts(); // 再描画して数値を反映
         }
+
         async function postAA() {
-            const btn = document.getElementById('submit-btn');
             const title = document.getElementById('title').value;
             const content = document.getElementById('content').value;
             const tags = document.getElementById('tags').value;
-            if(!title || !content) return;
-            btn.disabled = true;
             await fetch('/api/posts', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ title, content, tags, author: currentUser.displayName, userId: currentUser.userId }) });
-            setTimeout(() => location.reload(), 500);
+            location.reload();
         }
-        function reportPost(id, authorId) { const r = prompt("通報理由:"); if(r) fetch('/api/report', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ postId: id, userId: currentUser.userId, reason: r, postAuthorId: authorId }) }).then(() => alert("通報しました")); }
-        function blockUser(tid) { if(confirm("非表示にしますか？")) fetch('/api/user/block', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({userId:currentUser.userId, targetId:tid}) }).then(() => location.reload()); }
-        function deletePost(id) { if(confirm("削除しますか？")) fetch('/api/admin/delete', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({postId:id, adminId:currentUser.userId}) }).then(() => loadPosts()); }
-        function logout() { localStorage.removeItem('aa_user'); location.reload(); }
-        
+        function reportPost(id, auth) { const r = prompt("理由:"); if(r) fetch('/api/report', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({postId:id, userId:currentUser.userId, reason:r, postAuthorId:auth}) }).then(() => alert("通報完了")); }
+
         updateUI(); loadPosts();
     </script>
 </body>
