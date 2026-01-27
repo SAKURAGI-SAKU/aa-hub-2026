@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>管理パネル - AA HUB</title>
+    <style>
+        body { font-family: sans-serif; background: #2f3542; color: white; padding: 20px; }
+        .post-item { background: #57606f; padding: 15px; margin-bottom: 10px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; }
+        .del-btn { background: #ff4757; color: white; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer; }
+        .aa-preview { font-family: "MS PGothic"; font-size: 12px; white-space: pre; background: #eee; color: #333; padding: 5px; max-height: 50px; overflow: hidden; }
+        a { color: #1e90ff; }
+    </style>
+</head>
+<body>
+    <h1>管理パネル (投稿削除)</h1>
+    <p><a href="/">掲示板に戻る</a></p>
+    <div id="admin-list">読み込み中...</div>
+
+    <script>
+        const currentUser = JSON.parse(localStorage.getItem('aa_user') || 'null');
+
+        // 管理者でない場合は追い返す
+        if (!currentUser || !currentUser.isAdmin) {
+            alert("管理者権限がありません");
+            window.location.href = "/";
+        }
+
+        async function loadAdminPosts() {
+            const res = await fetch('/api/posts');
+            const data = await res.json();
+            document.getElementById('admin-list').innerHTML = data.map(p => `
+                <div class="post-item">
+                    <div>
+                        <strong>${p.title}</strong> (投稿者: ${p.author})<br>
+                        <div class="aa-preview">${p.content}</div>
+                    </div>
+                    <button class="del-btn" onclick="deletePost('${p.id}')">削除</button>
+                </div>
+            `).join('');
+        }
+
+        async function deletePost(postId) {
+            if (!confirm("本当に削除しますか？")) return;
+            const res = await fetch('/api/admin/delete', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ postId, userId: currentUser.userId })
+            });
+            const data = await res.json();
+            if (data.success) {
+                alert("削除しました");
+                loadAdminPosts();
+            } else {
+                alert(data.error);
+            }
+        }
+        loadAdminPosts();
+    </script>
+</body>
+</html>
