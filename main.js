@@ -16,11 +16,14 @@ async function checkBan(req, res, next) {
 // --- 認証系 ---
 app.post("/api/register", checkBan, async (req, res) => {
     const { userId, password, displayName } = req.body;
+    if (!userId || !password) return res.status(400).json({ error: "入力が不足しています" });
     const existing = await kv.get(["users", userId]);
-    if (existing.value) return res.status(400).json({ error: "ID重複" });
+    if (existing.value) return res.status(400).json({ error: "このIDは既に使用されています" });
+    
     const ip = req.headers["x-forwarded-for"] || "unknown";
     let isFirst = true;
     for await (const _ of kv.list({ prefix: ["users"] }, { limit: 1 })) { isFirst = false; }
+    
     const user = { userId, password, displayName: displayName || userId, isAdmin: isFirst, ip, blockList: [] };
     await kv.set(["users", userId], user);
     res.json({ success: true, user });
@@ -29,8 +32,11 @@ app.post("/api/register", checkBan, async (req, res) => {
 app.post("/api/login", checkBan, async (req, res) => {
     const { userId, password } = req.body;
     const user = await kv.get(["users", userId]);
-    if (user.value && user.value.password === password) res.json({ success: true, user: user.value });
-    else res.status(401).json({ error: "認証失敗" });
+    if (user.value && user.value.password === password) {
+        res.json({ success: true, user: user.value });
+    } else {
+        res.status(401).json({ error: "IDまたはパスワードが間違っています" });
+    }
 });
 
 // --- 掲示板API ---
@@ -42,7 +48,7 @@ app.get("/api/posts", async (req, res) => {
         blockerList = viewer.value?.blockList || [];
     }
     const posts = [];
-    const iter = kv.list({ prefix: ["posts"] }, { reverse: true, consistency: "strong" });
+    const iter = kv.list({ prefix: ["posts"] }, { reverse: true });
     for await (const entry of iter) {
         const p = entry.value;
         if (blockerList.includes(p.userId)) continue;
@@ -80,6 +86,23 @@ app.post("/api/posts/:id/like", async (req, res) => {
     } else res.status(404).send();
 });
 
+// --- ユーザープロフィール・通報API ---
+app.get("/api/users/:uid/posts", async (req, res) => {
+    const posts = [];
+    const iter = kv.list({ prefix: ["posts"] }, { reverse: true });
+    for await (const entry of iter) {
+        if (entry.value.userId === req.params.uid) posts.push(entry.value);
+    }
+    res.json(posts);
+});
+
+app.post("/api/report", async (req, res) => {
+    const { postId, userId, reason, postAuthorId } = req.body;
+    const id = Date.now().toString();
+    await kv.set(["reports", id], { id, postId, reporterId: userId, targetUserId: postAuthorId, reason, createdAt: new Date() });
+    res.json({ success: true });
+});
+
 // --- 通知・緊急メッセージ ---
 app.get("/api/emergency", async (req, res) => {
     const entry = await kv.get(["emergency_message"]);
@@ -88,7 +111,7 @@ app.get("/api/emergency", async (req, res) => {
 
 app.get("/api/notifications/:userId", async (req, res) => {
     const notes = [];
-    const iter = kv.list({ prefix: ["notifications", req.params.userId] }, { reverse: true, consistency: "strong" });
+    const iter = kv.list({ prefix: ["notifications", req.params.userId] }, { reverse: true });
     for await (const entry of iter) {
         if (!entry.value.read) notes.push(entry.value);
     }
@@ -106,7 +129,7 @@ app.post("/api/notifications/read", async (req, res) => {
     res.json({ success: true });
 });
 
-// 管理者用API
+// --- 管理者用API ---
 app.post("/api/admin/emergency", async (req, res) => {
     const { adminId, message } = req.body;
     const admin = await kv.get(["users", adminId]);
@@ -120,7 +143,6 @@ app.post("/api/admin/notify", async (req, res) => {
     const admin = await kv.get(["users", adminId]);
     if (!admin.value?.isAdmin) return res.status(403).send();
     const id = Date.now().toString();
-    // isEmergencyがtrueなら、ユーザーの画面に強制表示されるフラグ
     await kv.set(["notifications", targetUserId, id], { id, message, createdAt: new Date().getTime().toString(), read: false, isEmergency: !!isEmergency });
     res.json({ success: true });
 });
@@ -128,27 +150,19 @@ app.post("/api/admin/notify", async (req, res) => {
 app.post("/api/admin/delete", async (req, res) => {
     const { postId, adminId } = req.body;
     const admin = await kv.get(["users", adminId]);
-    if (admin.value?.isAdmin) await kv.delete(["posts", postId]);
-    res.json({ success: true });
+    if (admin.value?.isAdmin) {
+        await kv.delete(["posts", postId]);
+        res.json({ success: true });
+    } else {
+        res.status(403).send();
+    }
 });
 
 app.get("/api/admin/reports", async (req, res) => {
     const reports = [];
-    const iter = kv.list({ prefix: ["reports"] }, { reverse: true, consistency: "strong" });
+    const iter = kv.list({ prefix: ["reports"] }, { reverse: true });
     for await (const entry of iter) { reports.push(entry.value); }
     res.json(reports);
-});
-
-app.post("/api/user/block", async (req, res) => {
-    const { userId, targetId } = req.body;
-    const u = await kv.get(["users", userId]);
-    if (u.value) {
-        const user = u.value;
-        if (!user.blockList) user.blockList = [];
-        if (!user.blockList.includes(targetId)) user.blockList.push(targetId);
-        await kv.set(["users", userId], user);
-        res.json({ success: true });
-    }
 });
 
 app.listen(8000);
