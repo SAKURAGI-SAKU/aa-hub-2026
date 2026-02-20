@@ -1,0 +1,41 @@
+// schema.prisma
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// ユーザー情報
+model User {
+  id        Int       @id @default(autoincrement())
+  username  String    @unique
+  password  String    // 暗号化して保存します
+  posts     AAPost[]  // 投稿したAAのリスト
+  likes     Like[]    // いいねしたリスト
+}
+
+// AA投稿情報
+model AAPost {
+  id        Int       @id @default(autoincrement())
+  title     String
+  content   String    // AAのテキストデータ
+  createdAt DateTime  @default(now())
+  authorId  Int
+  author    User      @relation(fields: [authorId], references: [id])
+  likes     Like[]
+}
+
+// いいね機能の中間テーブル
+model Like {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  postId    Int
+  user      User     @relation(fields: [userId], references: [id])
+  post      AAPost   @relation(fields: [postId], references: [id])
+
+  // 同じユーザーが同じ投稿に複数回いいねできないようにする
+  @@unique([userId, postId])
+}
