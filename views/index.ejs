@@ -1,0 +1,56 @@
+<!-- views/index.ejs -->
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>AA展示場</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <div class="header">
+        <h1>AA展示場</h1>
+        <div class="nav">
+            <% if (user) { %>
+                <span>ようこそ、<%= user.username %>さん</span>
+                <a href="/logout" class="btn">ログアウト</a>
+            <% } else { %>
+                <a href="/login" class="btn">ログイン</a>
+                <a href="/register" class="btn">新規登録</a>
+            <% } %>
+        </div>
+    </div>
+
+    <% if (user) { %>
+        <div class="post-form">
+            <h2>AAを投稿する</h2>
+            <form action="/post" method="POST">
+                <input type="text" name="title" placeholder="タイトル" required>
+                <textarea name="content" rows="10" placeholder="ここにAAを貼り付けてください" required></textarea>
+                <button type="submit" class="btn primary">投稿する</button>
+            </form>
+        </div>
+    <% } else { %>
+        <p class="login-prompt">AAを投稿したり、いいねをするには<a href="/login">ログイン</a>してください。</p>
+    <% } %>
+
+    <div class="timeline">
+        <% posts.forEach(post => { %>
+            <div class="aa-container">
+                <div class="post-header">
+                    <h2><%= post.title %></h2>
+                    <span class="author">投稿者: <%= post.author.username %></span>
+                </div>
+                <div class="aa-text"><%= post.content %></div>
+                <div class="post-footer">
+                    <form action="/like/<%= post.id %>" method="POST">
+                        <button type="submit" class="like-btn">
+                            ❤️ <%= post._count.likes %>
+                        </button>
+                    </form>
+                    <span class="date"><%= post.createdAt.toLocaleString('ja-JP') %></span>
+                </div>
+            </div>
+        <% }) %>
+    </div>
+</body>
+</html>
