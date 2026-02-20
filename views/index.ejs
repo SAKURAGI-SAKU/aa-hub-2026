@@ -1,4 +1,3 @@
-<!-- views/index.ejs -->
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -9,6 +8,7 @@
 <body>
     <div class="header">
         <h1>AA展示場</h1>
+        <!-- ログイン状態によって表示を切り替える部分 -->
         <div class="nav">
             <% if (user) { %>
                 <span>ようこそ、<%= user.username %>さん</span>
@@ -20,12 +20,13 @@
         </div>
     </div>
 
+    <!-- ログインしている人だけ投稿フォームを表示 -->
     <% if (user) { %>
         <div class="post-form">
             <h2>AAを投稿する</h2>
             <form action="/post" method="POST">
-                <input type="text" name="title" placeholder="タイトル" required>
-                <textarea name="content" rows="10" placeholder="ここにAAを貼り付けてください" required></textarea>
+                <input type="text" name="title" placeholder="作品のタイトル" required>
+                <textarea name="content" rows="10" placeholder="ここにAAを貼り付け" required></textarea>
                 <button type="submit" class="btn primary">投稿する</button>
             </form>
         </div>
@@ -33,22 +34,13 @@
         <p class="login-prompt">AAを投稿したり、いいねをするには<a href="/login">ログイン</a>してください。</p>
     <% } %>
 
+    <!-- 投稿されたAAの一覧表示 -->
     <div class="timeline">
         <% posts.forEach(post => { %>
             <div class="aa-container">
-                <div class="post-header">
-                    <h2><%= post.title %></h2>
-                    <span class="author">投稿者: <%= post.author.username %></span>
-                </div>
+                <h2><%= post.title %></h2>
                 <div class="aa-text"><%= post.content %></div>
-                <div class="post-footer">
-                    <form action="/like/<%= post.id %>" method="POST">
-                        <button type="submit" class="like-btn">
-                            ❤️ <%= post._count.likes %>
-                        </button>
-                    </form>
-                    <span class="date"><%= post.createdAt.toLocaleString('ja-JP') %></span>
-                </div>
+                <p>投稿者: <%= post.author.username %></p>
             </div>
         <% }) %>
     </div>
