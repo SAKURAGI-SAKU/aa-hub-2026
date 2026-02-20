@@ -1,0 +1,20 @@
+<!-- views/register.ejs -->
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>新規登録 - AA展示場</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <div class="auth-container">
+        <h1>新規登録</h1>
+        <form action="/register" method="POST">
+            <input type="text" name="username" placeholder="ユーザー名" required>
+            <input type="password" name="password" placeholder="パスワード" required>
+            <button type="submit" class="btn primary">登録する</button>
+        </form>
+        <p><a href="/">トップに戻る</a></p>
+    </div>
+</body>
+</html>
