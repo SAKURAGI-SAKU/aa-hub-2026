@@ -5,7 +5,7 @@
     <title>AA展示場</title>
     <link rel="stylesheet" href="/style.css">
     <style>
-        /* プレビュー用の微調整 */
+        /* プレビューとスライダー用のスタイル追加 */
         #aa-preview {
             min-height: 100px;
             border: 2px dashed #ddd;
@@ -19,11 +19,23 @@
             margin-top: 10px;
             display: block;
         }
-        .post-footer {
+        .controls {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 10px;
             display: flex;
             align-items: center;
             gap: 15px;
-            margin-top: 10px;
+        }
+        input[type="range"] {
+            cursor: pointer;
+            width: 200px;
+        }
+        .font-size-display {
+            font-weight: bold;
+            color: #1a73e8;
+            min-width: 50px;
         }
     </style>
 </head>
@@ -50,8 +62,16 @@
                 <label class="preview-label">内容入力：</label>
                 <textarea id="aa-input" name="content" rows="10" placeholder="ここにAAを貼り付け" required></textarea>
                 
-                <label class="preview-label">▼ リアルタイムプレビュー (ここで崩れを確認！)</label>
-                <pre id="aa-preview" class="aa-text"></pre>
+                <label class="preview-label">▼ リアルタイムプレビュー (フォントサイズを調整して確認！)</label>
+                
+                <!-- フォントサイズ調整スライダー -->
+                <div class="controls">
+                    <span>文字サイズ:</span>
+                    <input type="range" id="font-slider" min="1" max="30" value="16">
+                    <span class="font-size-display"><span id="size-num">16</span>px</span>
+                </div>
+
+                <pre id="aa-preview" class="aa-text" style="font-size: 16px;"></pre>
                 
                 <button type="submit" class="btn primary">投稿する</button>
             </form>
@@ -68,18 +88,15 @@
                     <span class="author">投稿者: <%= post.author.username %></span>
                 </div>
                 
+                <!-- 一覧側のAAも、CSSで指定したデフォルトサイズで表示 -->
                 <pre class="aa-text"><%= post.content %></pre>
                 
-                <div class="post-footer">
+                <div class="post-footer" style="display: flex; align-items: center; gap: 15px; margin-top: 10px;">
                     <span class="date"><%= post.createdAt.toLocaleDateString() %></span>
                     
-                    <!-- いいね機能の連動 -->
                     <form action="/like/<%= post.id %>" method="POST" style="display:inline;">
                         <button type="submit" class="like-btn">
-                            <% 
-                                // 自分がいいねしているかチェック
-                                const isLiked = user && post.likes.some(l => l.userId === user.id);
-                            %>
+                            <% const isLiked = user && post.likes.some(l => l.userId === user.id); %>
                             <%= isLiked ? '❤️ いいね解除' : '👍 いいね！' %> 
                             (<%= post._count.likes %>)
                         </button>
@@ -89,14 +106,25 @@
         <% }) %>
     </div>
 
-    <!-- プレビューを動かすJavaScript -->
     <script>
         const input = document.getElementById('aa-input');
         const preview = document.getElementById('aa-preview');
+        const slider = document.getElementById('font-slider');
+        const sizeNum = document.getElementById('size-num');
 
+        // 入力時にプレビューを更新
         if (input && preview) {
             input.addEventListener('input', () => {
                 preview.textContent = input.value;
+            });
+        }
+
+        // スライダー操作時にフォントサイズを変更
+        if (slider && preview) {
+            slider.addEventListener('input', (e) => {
+                const size = e.target.value;
+                preview.style.fontSize = size + 'px';
+                sizeNum.textContent = size;
             });
         }
     </script>
