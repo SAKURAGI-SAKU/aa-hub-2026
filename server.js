@@ -9,7 +9,9 @@ const app = express();
 const prisma = new PrismaClient();
 
 app.set('view engine', 'ejs');
-app.use(express.urlencoded({ extended: true }));
+// server.js の該当箇所をこれに書き換え
+app.use(express.json({ limit: '10mb' })); // JSON形式も10MBまで
+app.use(express.urlencoded({ limit: '10mb', extended: true })); // フォーム送信を10MBまで
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.use(session({
