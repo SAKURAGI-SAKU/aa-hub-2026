@@ -4,11 +4,32 @@
     <meta charset="UTF-8">
     <title>AA展示場</title>
     <link rel="stylesheet" href="/style.css">
+    <style>
+        /* プレビュー用の微調整 */
+        #aa-preview {
+            min-height: 100px;
+            border: 2px dashed #ddd;
+            background-color: #fff;
+            margin-top: 10px;
+            margin-bottom: 20px;
+        }
+        .preview-label {
+            font-size: 13px;
+            color: #666;
+            margin-top: 10px;
+            display: block;
+        }
+        .post-footer {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-top: 10px;
+        }
+    </style>
 </head>
 <body>
     <div class="header">
         <h1>AA展示場</h1>
-        <!-- ログイン状態によって表示を切り替える部分 -->
         <div class="nav">
             <% if (user) { %>
                 <span>ようこそ、<%= user.username %>さん</span>
@@ -20,13 +41,18 @@
         </div>
     </div>
 
-    <!-- ログインしている人だけ投稿フォームを表示 -->
     <% if (user) { %>
         <div class="post-form">
             <h2>AAを投稿する</h2>
             <form action="/post" method="POST">
                 <input type="text" name="title" placeholder="作品のタイトル" required>
-                <textarea name="content" rows="10" placeholder="ここにAAを貼り付け" required></textarea>
+                
+                <label class="preview-label">内容入力：</label>
+                <textarea id="aa-input" name="content" rows="10" placeholder="ここにAAを貼り付け" required></textarea>
+                
+                <label class="preview-label">▼ リアルタイムプレビュー (ここで崩れを確認！)</label>
+                <pre id="aa-preview" class="aa-text"></pre>
+                
                 <button type="submit" class="btn primary">投稿する</button>
             </form>
         </div>
@@ -34,15 +60,45 @@
         <p class="login-prompt">AAを投稿したり、いいねをするには<a href="/login">ログイン</a>してください。</p>
     <% } %>
 
-    <!-- 投稿されたAAの一覧表示 -->
     <div class="timeline">
         <% posts.forEach(post => { %>
             <div class="aa-container">
-                <h2><%= post.title %></h2>
-                <div class="aa-text"><%= post.content %></div>
-                <p>投稿者: <%= post.author.username %></p>
+                <div class="post-header">
+                    <h2><%= post.title %></h2>
+                    <span class="author">投稿者: <%= post.author.username %></span>
+                </div>
+                
+                <pre class="aa-text"><%= post.content %></pre>
+                
+                <div class="post-footer">
+                    <span class="date"><%= post.createdAt.toLocaleDateString() %></span>
+                    
+                    <!-- いいね機能の連動 -->
+                    <form action="/like/<%= post.id %>" method="POST" style="display:inline;">
+                        <button type="submit" class="like-btn">
+                            <% 
+                                // 自分がいいねしているかチェック
+                                const isLiked = user && post.likes.some(l => l.userId === user.id);
+                            %>
+                            <%= isLiked ? '❤️ いいね解除' : '👍 いいね！' %> 
+                            (<%= post._count.likes %>)
+                        </button>
+                    </form>
+                </div>
             </div>
         <% }) %>
     </div>
+
+    <!-- プレビューを動かすJavaScript -->
+    <script>
+        const input = document.getElementById('aa-input');
+        const preview = document.getElementById('aa-preview');
+
+        if (input && preview) {
+            input.addEventListener('input', () => {
+                preview.textContent = input.value;
+            });
+        }
+    </script>
 </body>
 </html>
