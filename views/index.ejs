@@ -8,10 +8,20 @@
         #aa-preview { min-height: 100px; border: 2px dashed #ddd; background-color: #fff; margin-bottom: 20px; }
         .controls { background: #f8f9fa; padding: 10px; border-radius: 4px; margin-bottom: 10px; display: flex; align-items: center; gap: 10px; font-size: 14px; }
         input[type="range"] { cursor: pointer; width: 150px; }
+        
+        /* ★ロビー表示制限スタイル */
+        .lobby-post .aa-text {
+            max-height: 300px;
+            overflow: hidden;
+            mask-image: linear-gradient(to bottom, black 80%, transparent 100%);
+            -webkit-mask-image: linear-gradient(to bottom, black 80%, transparent 100%);
+        }
+        .full-post .aa-text { max-height: none; overflow: visible; mask-image: none; -webkit-mask-image: none; }
+        
         .post-footer { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-top: 15px; border-top: 1px solid #eee; padding-top: 10px; }
         .footer-left, .footer-right { display: flex; align-items: center; gap: 10px; }
         .delete-btn { color: #ff4757; background: none; border: 1px solid #ff4757; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 12px; }
-        .delete-btn:hover { background: #ff4757; color: #fff; }
+        .more-link { display: block; text-align: center; padding: 10px; background: #eee; text-decoration: none; color: #1a73e8; border-radius: 4px; margin-top: -10px; margin-bottom: 15px; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -19,7 +29,7 @@
         <h1><a href="/" style="text-decoration:none; color:inherit;">AA展示場</a></h1>
         <div class="nav">
             <% if (user) { %>
-                <span>ようこそ、<%= user.username %>さん</span>
+                <span><%= user.username %>さん</span>
                 <a href="/logout" class="btn">ログアウト</a>
             <% } else { %>
                 <a href="/login" class="btn">ログイン</a>
@@ -28,15 +38,15 @@
         </div>
     </div>
 
-    <% if (user) { %>
-        <!-- 投稿フォーム（トップページのみ表示） -->
+    <!-- 投稿フォーム（一覧画面のみ表示） -->
+    <% if (user && !isSingle) { %>
         <div class="post-form">
             <h2>AAを投稿する</h2>
             <form action="/post" method="POST">
-                <input type="text" name="title" placeholder="作品のタイトル" required>
-                <textarea id="aa-input" name="content" rows="10" placeholder="ここにAAを貼り付け" required></textarea>
+                <input type="text" name="title" placeholder="タイトル" required>
+                <textarea id="aa-input" name="content" rows="10" placeholder="AAを貼り付け" required></textarea>
                 <div class="controls">
-                    <span>サイズ:</span>
+                    <span>投稿前サイズ:</span>
                     <input type="range" class="size-slider" data-target="aa-preview" min="1" max="30" value="16">
                 </div>
                 <pre id="aa-preview" class="aa-text" style="font-size: 16px;"></pre>
@@ -47,10 +57,10 @@
 
     <div class="timeline">
         <% posts.forEach((post, index) => { %>
-            <div class="aa-container">
+            <div class="aa-container <%= isSingle ? 'full-post' : 'lobby-post' %>">
                 <div class="post-header">
                     <h2><a href="/post/<%= post.id %>" style="text-decoration:none; color:inherit;"><%= post.title %></a></h2>
-                    <span class="author">投稿者: <%= post.author.username %></span>
+                    <span class="author">by <%= post.author.username %></span>
                 </div>
                 
                 <div class="controls">
@@ -60,23 +70,25 @@
 
                 <pre id="post-text-<%= index %>" class="aa-text"><%= post.content %></pre>
                 
+                <% if (!isSingle) { %>
+                    <a href="/post/<%= post.id %>" class="more-link">全編を表示する</a>
+                <% } %>
+                
                 <div class="post-footer">
                     <div class="footer-left">
                         <span class="date"><%= post.createdAt.toLocaleDateString() %></span>
-                        <a href="/post/<%= post.id %>" class="btn" style="font-size:12px;">🔗 個別URL</a>
+                        <button class="btn" style="font-size:11px;" onclick="navigator.clipboard.writeText(window.location.origin + '/post/<%= post.id %>').then(()=>alert('URLコピー完了'))">🔗 リンクをコピー</button>
                     </div>
                     
                     <div class="footer-right">
                         <form action="/like/<%= post.id %>" method="POST" style="display:inline;">
                             <button type="submit" class="like-btn">
                                 <% const isLiked = user && post.likes.some(l => l.userId === user.id); %>
-                                <%= isLiked ? '❤️ 解除' : '👍 いいね！' %> (<%= post._count.likes %>)
+                                <%= isLiked ? '❤️' : '👍' %> (<%= post._count.likes %>)
                             </button>
                         </form>
-
-                        <!-- 自分の投稿なら削除ボタンを表示 -->
                         <% if (user && post.authorId === user.id) { %>
-                            <form action="/post/<%= post.id %>/delete" method="POST" onsubmit="return confirm('本当に削除しますか？')">
+                            <form action="/post/<%= post.id %>/delete" method="POST" onsubmit="return confirm('削除しますか？')">
                                 <button type="submit" class="delete-btn">削除</button>
                             </form>
                         <% } %>
@@ -92,12 +104,11 @@
         if (input && preview) {
             input.addEventListener('input', () => { preview.textContent = input.value; });
         }
-
         document.querySelectorAll('.size-slider').forEach(slider => {
             slider.addEventListener('input', (e) => {
                 const targetId = e.target.getAttribute('data-target');
-                const targetElement = document.getElementById(targetId);
-                if (targetElement) { targetElement.style.fontSize = e.target.value + 'px'; }
+                const target = document.getElementById(targetId);
+                if (target) target.style.fontSize = e.target.value + 'px';
             });
         });
     </script>
