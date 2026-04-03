@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>AA投稿ギャラリー</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <h1>AA投稿掲示板</h1>
+    
+    <!-- 投稿フォーム -->
+    <form action="/post" method="post" class="post-form">
+        <input type="text" name="title" placeholder="タイトル" required><br>
+        <textarea name="content" rows="10" placeholder="ここにAAを貼り付け" required></textarea><br>
+        <button type="submit">投稿する</button>
+    </form>
+
+    <hr>
+
+    <!-- 投稿一覧 -->
+    {% for post in posts %}
+    <div class="aa-container">
+        <h2>{{ post.title }}</h2>
+        <pre class="aa-content">{{ post.content }}</pre>
+    </div>
+    {% endfor %}
+</body>
+</html>
