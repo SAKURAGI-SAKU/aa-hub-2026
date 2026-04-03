@@ -25,4 +25,6 @@ def post():
     return redirect('/')
 
 if __name__ == '__main__':
-    app.run()
+    # Renderの環境変数 PORT を使うように修正
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port)
