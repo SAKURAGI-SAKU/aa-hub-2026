@@ -1,0 +1,13 @@
+body { font-family: sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+.post-form input, .post-form textarea { width: 100%; margin-bottom: 10px; }
+
+.aa-content {
+    font-family: "MS PGothic", "Mona", "Textar", sans-serif;
+    font-size: 16px;
+    line-height: 1.1;
+    white-space: pre;
+    background: #f0f0f0;
+    padding: 15px;
+    overflow-x: auto;
+    border: 1px solid #ccc;
+}
